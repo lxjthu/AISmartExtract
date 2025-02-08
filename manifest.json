@@ -1,0 +1,14 @@
+{
+  "id": "obsidian-ai-extract",
+  "name": "AI Smart Extract",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "使用AI提取文本关键词并创建智能笔记卡片，支持双向链接。",
+  "author": "小狼早上好",
+  "authorUrl": "https://github.com/lxjthu",
+  "isDesktopOnly": false,
+  "fundingUrl": {
+      "Buy Me a Coffee": "https://www.buymeacoffee.com/lxjthu",
+      "GitHub Sponsor": "https://github.com/sponsors/lxjthu"
+  }
+}
