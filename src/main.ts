@@ -16,6 +16,8 @@ interface PluginSettings {
     promptTemplate: string;         // 添加提示词模板设置
     defaultPrompt: string;          // 添加默认提示词设置
     targetFolder: string;          // 添加目标文件夹设置
+    quoteCallout: string;     // 引用标注类型，默认为 'cite'
+    quoteCollapsible: boolean; // 是否可折叠，默认为 true
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -24,11 +26,13 @@ const DEFAULT_SETTINGS: PluginSettings = {
     addBacklinks: true,
     backlinkStyle: 'wiki',
     addBacklinksSection: true,
+    quoteCallout: 'cite',
+    quoteCollapsible: true,
     targetFolder: 'Extractcards',         // 默认文件夹名称
     promptTemplate: `请分析以下文本，提供：
     1. 3-5个关键词
     2. 一句话总结（15字以内，不要加句号）
-    3. 3-5个相关标签（每个标签以#开头）
+    3. 将关键词转换为3-5个相关标签（每个标签以#开头）
     
     请按照以下格式返回：
     关键词：关键词1，关键词2，关键词3
@@ -273,18 +277,37 @@ private getFullPath(fileName: string): string {
             const originalContent = await this.app.vault.read(originalFile);
             const selectedText = view.editor.getSelection();
             
-            // 根据设置选择链接样式
-            const linkText = this.settings.backlinkStyle === 'wiki' 
-                ? `[[${newNoteTitle}]]`
-                : `^[[${newNoteTitle}]]`;
+            let newContent = originalContent;
+            
+            if (this.settings.backlinkStyle === 'wiki') {
+                // Wiki 链接样式
+                const linkedText = `${selectedText} [[${newNoteTitle}]]`;
+                newContent = originalContent.replace(selectedText, linkedText);
+            } else {
+                // 引用链接样式
+                // 构建引用标题
+                const collapsible = this.settings.quoteCollapsible ? '+' : '';
+                const callout = this.settings.quoteCallout || 'cite';
+                const quoteTitle = `> [!${callout}]${collapsible} [[${newNoteTitle}]]`;
                 
-            // 构建新的链接文本
-            const linkedText = `${selectedText} ${linkText}`;
+                // 确保选中文本前后有空行
+                const quotedText = selectedText.split('\n')
+                    .map(line => `> ${line}`)
+                    .join('\n');
+                    
+                // 构建引用块
+                const quoteBlock = [
+                    '',  // 确保前面有空行
+                    quoteTitle,  // 使用构建的引用标题
+                    quotedText,
+                    ''   // 确保后面有空行
+                ].join('\n');
+                
+                // 替换原文中的选中文本
+                newContent = originalContent.replace(selectedText, quoteBlock);
+            }
             
-            // 构建新内容
-            let newContent = originalContent.replace(selectedText, linkedText);
-            
-            // 如果设置了添加相关笔记区域
+            // 添加相关笔记区域（如果启用）
             if (this.settings.addBacklinksSection) {
                 const backlinksHeader = '## 相关笔记';
                 const newBacklink = `- [[${newNoteTitle}]]`;
@@ -304,14 +327,12 @@ private getFullPath(fileName: string): string {
                 }
             }
             
-            // 一次性更新文件内容
+            // 更新文件内容
             await this.app.vault.modify(originalFile, newContent);
             
-            // 更新编辑器视图
-            view.editor.setValue(newContent);
-            
-            // 恢复光标位置
+            // 更新编辑器视图并保持光标位置
             const cursor = view.editor.getCursor();
+            view.editor.setValue(newContent);
             view.editor.setCursor(cursor);
             
         } catch (error) {
@@ -319,6 +340,8 @@ private getFullPath(fileName: string): string {
             console.error('添加反向链接失败:', error);
         }
     }
+    
+    
     
     
 
@@ -437,6 +460,26 @@ class AISmartExtractSettingTab extends PluginSettingTab {
                     this.plugin.settings.backlinkStyle = value as 'wiki' | 'ref';
                     await this.plugin.saveSettings();
                 }));
+        new Setting(containerEl)
+                .setName('引用标注类型')
+                .setDesc('设置引用块的标注类型')
+                .addText(text => text
+                    .setPlaceholder('cite')
+                    .setValue(this.plugin.settings.quoteCallout)
+                    .onChange(async (value) => {
+                        this.plugin.settings.quoteCallout = value;
+                        await this.plugin.saveSettings();
+                    }));
+            
+        new Setting(containerEl)
+                .setName('可折叠引用')
+                .setDesc('引用块是否可折叠')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.quoteCollapsible)
+                    .onChange(async (value) => {
+                        this.plugin.settings.quoteCollapsible = value;
+                        await this.plugin.saveSettings();
+                    }));
 
         new Setting(containerEl)
             .setName('添加相关笔记区域')
