@@ -1,4 +1,3 @@
-好的,我来帮你写一个详细的 README 文件:
 
 # Obsidian AI Smart Extract Plugin
 
@@ -30,12 +29,14 @@ AI Smart Extract 是一个 Obsidian 插件,它可以帮助你快速从选中的�
 
 ## 安装步骤
 
-1. 打开 Obsidian 设置
-2. 进入 "第三方插件"
-3. 关闭 "安全模式"
-4. 点击 "浏览" 进入插件市场
-5. 搜索 "AI Smart Extract"
-6. 点击 "安装"
+1. 下载obsidian-task-board-1.0.0.zip安装包，解压缩
+2. 安装Obsidian软件
+3. 打开 Obsidian 设置
+4. 进入 "第三方插件"
+5. 关闭 "安全模式"
+6. 点击“已安装插件”边上的文件夹图标，进入.obsidian\plugins文件夹
+7. 将解压缩后的obsidian-task-board-1.0.1文件夹粘贴进去
+8. 点击“重新加载插件”按钮，设置插件具体配置
 
 ## 配置说明
 
