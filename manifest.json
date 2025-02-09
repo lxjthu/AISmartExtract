@@ -1,14 +1,26 @@
 {
-  "id": "obsidian-ai-extract",
+  "id": "obsidian-ai-smart-extract",
   "name": "AI Smart Extract",
-  "version": "1.0.0",
-  "minAppVersion": "1.0.0",
-  "description": "使用AI提取文本关键词并创建智能笔记卡片，支持双向链接。",
+  "version": "1.0.1",
+  "minAppVersion": "1.4.0",
+  "description": "使用AI智能提取文本并创建笔记",
   "author": "小狼早上好",
   "authorUrl": "https://github.com/lxjthu",
-  "isDesktopOnly": false,
-  "fundingUrl": {
-      "Buy Me a Coffee": "https://www.buymeacoffee.com/lxjthu",
-      "GitHub Sponsor": "https://github.com/sponsors/lxjthu"
-  }
+  "isDesktopOnly": true,
+  "dependencies": {
+        "pdf": true
+    },
+  "commands": [
+      {
+          "id": "create-smart-note-from-markdown",
+          "name": "从Markdown选中文本创建智能笔记",
+          "icon": "document"
+      },
+      {
+          "id": "create-smart-note-from-pdf",
+          "name": "从PDF选中文本创建智能笔记",
+          "icon": "pdf-file",
+          "checkCallback": true   
+      }
+  ]
 }
