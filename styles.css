@@ -1,0 +1,47 @@
+.folder-suggest-modal {
+    padding: 1em;
+}
+
+.folder-suggest-modal .search-container {
+    margin-bottom: 1em;
+}
+
+.folder-suggest-modal input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.folder-suggest-modal .folder-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.folder-suggest-modal .folder-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.folder-suggest-modal .folder-item:hover,
+.folder-suggest-modal .folder-item.is-selected {
+    background-color: var(--background-modifier-hover);
+}
+
+.folder-suggest-modal .folder-icon {
+    margin-right: 8px;
+    color: var(--text-muted);
+}
+
+.folder-suggest-modal .folder-path {
+    flex: 1;
+}
+
+.folder-suggest-modal .no-results {
+    padding: 1em;
+    text-align: center;
+    color: var(--text-muted);
+}

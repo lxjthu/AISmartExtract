@@ -1,12 +1,13 @@
 {
-  "id": "obsidian-ai-smart-extract",
-  "name": "AI Smart Extract",
-  "version": "1.0.1",
+  "id": "obsidian-ai-smart-extract-2.0.1",
+  "name": "AI Smart Extract-2",
+  "version": "2.0.1",
   "minAppVersion": "1.4.0",
   "description": "使用AI智能提取文本并创建笔记",
   "author": "小狼早上好",
   "authorUrl": "https://github.com/lxjthu",
   "isDesktopOnly": true,
+  "styles": ["styles.css"],
   "dependencies": {
         "pdf": true
     },
