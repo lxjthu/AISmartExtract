@@ -1,8 +1,8 @@
 // src/settings/settingTab.ts
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, Modal,Notice } from 'obsidian';
 import type { TextComponent } from 'obsidian'; // 添加这个导入
 import type AISmartExtractPlugin from '../main';
-import { AIProvider, ProviderSettings } from '../types';
+import { AIProvider, ProviderSettings,PromptTemplate, PluginSettings } from '../types';
 import { FolderSuggestModal } from '../modals/folderSuggest';
 export class AISmartExtractSettingTab extends PluginSettingTab {
     plugin: AISmartExtractPlugin;
@@ -181,7 +181,42 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // PDF 设置
+        // 批量处理设置部分
+        containerEl.createEl('h3', { text: '批量处理设置' });
+
+        new Setting(containerEl)
+            .setName('最大并发数')
+            .setDesc('同时处理的最大文件数（1-10）')
+            .addSlider(slider => slider
+                .setLimits(1, 10, 1)
+                .setValue(this.plugin.settings.batchProcessing.maxConcurrent)
+                .onChange(async (value) => {
+                    this.plugin.settings.batchProcessing.maxConcurrent = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('处理间隔')
+            .setDesc('每个文件处理之间的延迟（毫秒）')
+            .addSlider(slider => slider
+                .setLimits(0, 5000, 100)
+                .setValue(this.plugin.settings.batchProcessing.delayBetweenFiles)
+                .onChange(async (value) => {
+                    this.plugin.settings.batchProcessing.delayBetweenFiles = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('跳过已有标签')
+            .setDesc('是否跳过已经包含标签的文件')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.batchProcessing.skipExistingTags)
+                .onChange(async (value) => {
+                    this.plugin.settings.batchProcessing.skipExistingTags = value;
+                    await this.plugin.saveSettings();
+                }));
+        
+                // PDF 设置
         containerEl.createEl('h3', { text: 'PDF 设置' });
 
         new Setting(containerEl)
@@ -306,8 +341,95 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
             this.plugin.settings.promptTemplate = target.value;
             await this.plugin.saveSettings();
         });
+
+         // 提示词模板管理
+         containerEl.createEl('h3', { text: 'AI 提示词模板管理' });
+
+         // 显示现有模板列表
+         this.plugin.settings.promptTemplates.forEach(template => {
+             const templateContainer = containerEl.createDiv('template-container');
+             templateContainer.addClass('template-item');
+ 
+             new Setting(templateContainer)
+                 .setName(template.name)
+                 .setDesc(template.description || '')
+                 .addButton(btn => btn
+                     .setButtonText('编辑')
+                     .onClick(() => {
+                         this.showTemplateEditModal(template);
+                     }))
+                 .addButton(btn => btn
+                     .setButtonText('删除')
+                     .onClick(async () => {
+                         if (template.id === 'default') {
+                             new Notice('不能删除默认模板');
+                             return;
+                         }
+                         this.plugin.settings.promptTemplates = 
+                             this.plugin.settings.promptTemplates.filter(t => t.id !== template.id);
+                         await this.plugin.saveSettings();
+                         this.display();
+                     }));
+         });
+ 
+         // 添加新模板按钮
+         new Setting(containerEl)
+             .setName('添加新模板')
+             .addButton(btn => btn
+                 .setButtonText('添加')
+                 .onClick(() => {
+                     this.showTemplateEditModal();
+                 }));
+ 
+         // 命令模板映射设置
+         containerEl.createEl('h3', { text: '命令模板映射' });
+         
+         // 为每个命令创建模板选择器
+         Object.keys(this.plugin.commands).forEach(commandId => {
+             const command = this.plugin.commands[commandId];
+             new Setting(containerEl)
+                 .setName(command.name)
+                 .addDropdown(dropdown => {
+                     // 添加所有可用模板作为选项
+                     this.plugin.settings.promptTemplates.forEach(template => {
+                         dropdown.addOption(template.id, template.name);
+                     });
+                     // 设置当前选中的模板
+                     dropdown.setValue(
+                         this.plugin.settings.commandTemplateMap[commandId] || 
+                         this.plugin.settings.defaultTemplateId
+                     );
+                     dropdown.onChange(async value => {
+                         this.plugin.settings.commandTemplateMap[commandId] = value;
+                         await this.plugin.saveSettings();
+                     });
+                 });
+         });
     }
 
+    private async showTemplateEditModal(template?: PromptTemplate) {
+        const modal = new TemplateEditModal(
+            this.app,
+            template,
+            async (result) => {
+                if (template) {
+                    // 更新现有模板
+                    const index = this.plugin.settings.promptTemplates
+                        .findIndex(t => t.id === template.id);
+                    if (index !== -1) {
+                        this.plugin.settings.promptTemplates[index] = result;
+                    }
+                } else {
+                    // 添加新模板
+                    result.id = String(Date.now()); // 简单的ID生成
+                    this.plugin.settings.promptTemplates.push(result);
+                }
+                await this.plugin.saveSettings();
+                this.display();
+            }
+        );
+        modal.open();
+    }
     private renderProviderSpecificSettings(containerEl: HTMLElement) {
         const provider = this.plugin.settings.aiProvider;
         const providerSettings = this.plugin.settings.providerSettings[provider];
@@ -354,5 +476,75 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
         }
+    }
+}
+
+// 模板编辑弹窗
+class TemplateEditModal extends Modal {
+    private template: PromptTemplate;
+    private onSubmit: (result: PromptTemplate) => Promise<void>;
+
+    constructor(
+        app: App,
+        template: PromptTemplate | undefined,
+        onSubmit: (result: PromptTemplate) => Promise<void>
+    ) {
+        super(app);
+        this.template = template || {
+            id: '',
+            name: '',
+            content: '',
+            description: ''
+        };
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const {contentEl} = this;
+
+        contentEl.createEl('h3', {text: this.template.id ? '编辑模板' : '新建模板'});
+
+        // 模板名称
+        new Setting(contentEl)
+            .setName('模板名称')
+            .addText(text => text
+                .setValue(this.template.name)
+                .onChange(value => this.template.name = value));
+
+        // 模板描述
+        new Setting(contentEl)
+            .setName('模板描述')
+            .addText(text => text
+                .setValue(this.template.description || '')
+                .onChange(value => this.template.description = value));
+
+        // 模板内容
+        contentEl.createEl('h4', {text: '模板内容'});
+        const textarea = contentEl.createEl('textarea', {
+            text: this.template.content
+        });
+        textarea.style.width = '100%';
+        textarea.style.height = '200px';
+        textarea.style.marginBottom = '1em';
+        textarea.addEventListener('input', e => {
+            this.template.content = (e.target as HTMLTextAreaElement).value;
+        });
+
+        // 保存按钮
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText('保存')
+                .onClick(async () => {
+                    await this.onSubmit(this.template);
+                    this.close();
+                }))
+            .addButton(btn => btn
+                .setButtonText('取消')
+                .onClick(() => this.close()));
+    }
+
+    onClose() {
+        const {contentEl} = this;
+        contentEl.empty();
     }
 }

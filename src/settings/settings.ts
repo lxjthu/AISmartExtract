@@ -1,5 +1,44 @@
 // src/settings/settings.ts
-import { PluginSettings } from '../types';
+import { PluginSettings,PromptTemplate  } from '../types';
+
+// 首先定义默认的提示词模板
+const DEFAULT_TEMPLATES: PromptTemplate[] = [
+    {
+        id: 'default',
+        name: '默认提示词',
+        content: `请分析以下文本，提供：
+1. 3-5个关键词
+2. 一句话总结（15字以内，不要加句号）
+3. 将关键词转换为3-5个相关标签（每个标签以#开头）
+
+请按照以下格式返回：
+关键词：关键词1，关键词2，关键词3
+总结：一句话总结
+标签：#标签1 #标签2 #标签3
+
+原文：
+{text}`,
+        description: '默认的提示词模板'
+    },
+    {
+        id: 'academic',
+        name: '学术总结',
+        content: `请分析以下学术文本，提供：
+1. 3-5个学术关键词
+2. 研究主要发现（20字以内）
+3. 相关学术领域标签
+
+格式：
+关键词：关键词1，关键词2，关键词3
+总结：主要研究发现
+标签：#领域1 #领域2 #领域3
+
+原文：
+{text}`,
+        description: '适用于学术文献的总结模板'
+    }
+];
+
 
 export const DEFAULT_SETTINGS: PluginSettings = {
     // API 相关设置
@@ -26,32 +65,20 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     pdfMetadataInContent: true,
     pdfSourceSection: '源文件信息',
     pdfTimestampFormat: 'YYYY-MM-DD HH:mm:ss',
+    // 批量处理默认设置
+    batchProcessing: {
+        maxConcurrent: 3,           // 默认同时处理3个文件
+        delayBetweenFiles: 1000,    // 默认间隔1秒
+        skipExistingTags: true      // 默认跳过已有标签的文件
+    },
+    // 新的提示词模板系统
+    promptTemplates: DEFAULT_TEMPLATES,
+    defaultTemplateId: 'default',
+    commandTemplateMap: {},
 
-    // 提示词模板
-    promptTemplate: `请分析以下文本，提供：
-1. 3-5个关键词
-2. 一句话总结（15字以内，不要加句号）
-3. 将关键词转换为3-5个相关标签（每个标签以#开头）
-
-请按照以下格式返回：
-关键词：关键词1，关键词2，关键词3
-总结：一句话总结
-标签：#标签1 #标签2 #标签3
-
-原文：
-{text}`,
-    defaultPrompt: `请分析以下文本，提供：
-1. 3-5个关键词
-2. 一句话总结（15字以内，不要加句号）
-3. 将关键词转换为3-5个相关标签（每个标签以#开头）
-
-请按照以下格式返回：
-关键词：关键词1，关键词2，关键词3
-总结：一句话总结
-标签：#标签1 #标签2 #标签3
-
-原文：
-{text}`,
+    // 保留现有的promptTemplate和defaultPrompt以保持向后兼容
+    promptTemplate: DEFAULT_TEMPLATES[0].content,
+    defaultPrompt: DEFAULT_TEMPLATES[0].content,
 
     // 扩展 providerSettings
     providerSettings: {

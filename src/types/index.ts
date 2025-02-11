@@ -1,5 +1,11 @@
 // src/types/index.ts
-import { TFile, View } from 'obsidian';
+import { TFile, View, Command } from 'obsidian';
+
+export interface ExtendedCommand extends Command {
+    id: string;
+    name: string;
+}
+
 
 // 扩展 AI 提供商类型
 export type AIProvider = 
@@ -30,6 +36,14 @@ export interface ProviderSettings {
 // 所有提供商设置的映射
 export type ProvidersConfig = Record<AIProvider, ProviderSettings>;
 
+
+// 批量处理设置接口
+export interface BatchProcessingSettings {
+    maxConcurrent: number;          // 最大并发数
+    delayBetweenFiles: number;      // 文件处理间隔（毫秒）
+    skipExistingTags: boolean;      // 是否跳过已有标签的文件
+}
+
 // 插件设置接口
 export interface PluginSettings {
     apiKey: string;
@@ -55,6 +69,21 @@ export interface PluginSettings {
     pdfMetadataInContent: boolean;      // 是否在正文中包含 PDF 元数据
     pdfSourceSection: string;           // PDF 源信息部分的标题
     pdfTimestampFormat: string;         // 时间戳格式
+    batchProcessing: BatchProcessingSettings;  // 批量处理设置
+    // 提示词模板相关
+    promptTemplates: PromptTemplate[];      // 所有可用的提示词模板
+    defaultTemplateId: string;              // 默认使用的模板ID
+    commandTemplateMap: {                   // 命令与模板的映射
+        [commandId: string]: string;        // key是命令ID，value是模板ID
+    };
+}
+
+// 提示词模板定义
+export interface PromptTemplate {
+    id: string;           // 模板唯一标识
+    name: string;         // 模板名称
+    content: string;      // 模板内容
+    description?: string; // 模板描述（可选）
 }
 
 // AI响应接口
@@ -62,6 +91,15 @@ export interface AIResponse {
     keywords: string[];
     summary: string;
     tags: string[];
+}
+
+// AI服务接口
+export interface AIService {
+    processText(
+        text: string,
+        templateContent?: string,
+        modelOverride?: string
+    ): Promise<AIResponse>;
 }
 
 // PDF选择接口

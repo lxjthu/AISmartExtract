@@ -3,7 +3,7 @@ import { App, View, TFile, Notice, MarkdownView } from 'obsidian';
 import { EmbeddedPDFView, PdfSelection } from '../types';
 import { cleanPdfText } from '../utils/textCleaner';
 import { NoteService } from './noteService';
-import { AIService } from './aiService';
+import { AIServiceImpl } from './aiService';
 
 export class PDFService {
     private selectionHandlers: WeakMap<View, () => void> = new WeakMap();
@@ -13,7 +13,7 @@ export class PDFService {
     constructor(
         private app: App,
         private noteService: NoteService,
-        private aiService: AIService
+        private aiService: AIServiceImpl
     ) {}
 
     async handlePdfSelection(view: EmbeddedPDFView) {
@@ -29,9 +29,10 @@ export class PDFService {
             const cleanedText = cleanPdfText(selection.text);
             
             await this.noteService.createFromMarkdown(
-                cleanedText,
-                view as unknown as MarkdownView,
-                selection
+                cleanedText,                          // 第一个参数：清理后的文本
+                view as unknown as MarkdownView,      // 第二个参数：视图
+                undefined,                            // 第三个参数：模板ID（如果不需要可以传undefined）
+                selection                            // 第四个参数：PDF选择信息
             );
 
             new Notice('笔记创建成功！');

@@ -1,109 +1,160 @@
-# Obsidian 智能笔记助手
+# AI Smart Extract Plugin for Obsidian
 
-## 🆕 最新更新
+## 简介
+这是一个 Obsidian 插件，能够智能提取文本内容并生成结构化的笔记。支持从 Markdown 和 PDF 文件中提取内容，自动生成关键词、摘要和标签，并创建智能化的笔记链接。
 
-### PDF 智能处理功能
-- ✨ 新增 PDF 文档智能处理支持
-  - 支持从 PDF 文档中选择文本并创建智能笔记
-  - 自动记录 PDF 页码、位置和缩放比例等元数据
-  - 优化了 PDF 文本清理算法，提供更好的文本提取质量
-  - 保护性设计：不修改原始 PDF 文件
+## 主要功能
 
-### AI 集成增强
-- 🤖 扩展 AI 工具支持
-  - 新增多个主流 AI API 支持：
-    - OpenAI (GPT-3.5/GPT-4)
-    - Anthropic Claude
-    - Google PaLM
-    - 智谱 ChatGLM
-  - 灵活的 API 配置选项
-    - 支持自定义 API 端点
-    - 可配置的模型参数
-    - 多账号负载均衡
+### 1. 智能笔记提取
+- 从 Markdown 选中文本创建智能笔记
+- 从 PDF 选中文本创建智能笔记
+- 自动生成关键词、摘要和标签
+- 支持自定义提示词模板
 
-### 笔记生成优化
-- 📝 增强的笔记结构
-  - 智能标题生成
-  - 自动关键词提取
-  - 标签智能推荐
-  - 可折叠的引用块
-  - 支持多种引用样式
+### 2. PDF 增强功能
+- PDF 文本智能提取
+- 自动记录 PDF 页码和位置信息
+- 支持可折叠引用块
+- 自动添加页面链接
 
-### 用户界面改进
-- 🎨 设置面板优化
-  - 分类整理的设置选项
-  - 直观的 AI 配置界面
-  - 实时配置验证
-  - 配置导入/导出功能
+### 3. 批量处理功能
+- 批量处理文件夹中的笔记
+- 智能添加标签
+- 可配置的并发处理数量
+- 处理间隔时间可调
 
-### 性能优化
-- ⚡️ 性能提升
-  - 异步处理优化
-  - 智能防抖动
-  - 内存使用优化
-  - 错误处理增强
+### 4. 链接管理
+- 自动创建双向链接
+- 支持 Wiki 和引用两种链接样式
+- 自动添加相关笔记区域
 
-## 配置说明
+## 配置选项
 
-### AI API 设置
-```typescript
-{
-  "aiProvider": "openai", // 可选: "openai", "anthropic", "palm", "chatglm"
-  "apiKey": "your-api-key",
-  "apiEndpoint": "https://api.openai.com/v1", // 可自定义 API 端点
-  "model": "gpt-3.5-turbo", // 根据提供商支持的模型选择
-  "temperature": 0.7,
-  "maxTokens": 2000
-}
+### AI 服务设置
+- 支持多种 AI 服务提供商：
+  - OpenAI
+  - Azure OpenAI
+  - Anthropic Claude
+  - Google Gemini
+  - 通义千问
+  - DeepSeek
+  - Mistral AI
+  - 文心一言
+  - 讯飞星火
+  - ChatGLM
+  - MiniMax
+  - Moonshot AI
+- 可配置 API 密钥和端点
+- 可选择不同的模型
+
+### 笔记设置
+- 自定义目标文件夹
+- 自定义链接样式
+- 引用标注类型设置
+- 可折叠引用选项
+
+### 批量处理设置
+- 最大并发数（1-10）
+- 处理间隔时间
+- 是否跳过已有标签的文件
+
+### PDF 设置
+- PDF 引用样式（引用框/代码块）
+- 页面链接选项
+- 元数据包含选项
+- 自定义笔记模板
+- 时间戳格式
+
+## 使用方法
+
+### 从 Markdown 创建笔记
+1. 选择文本
+2. 使用命令面板执行"从Markdown选中文本创建智能笔记"
+3. 等待处理完成
+
+### 从 PDF 创建笔记
+1. 在 PDF 中选择文本
+2. 使用命令面板执行"从PDF选中文本创建智能笔记"
+3. 等待处理完成
+
+### 批量处理文件夹
+1. 使用命令面板执行"批量处理文件夹中的笔记添加智能标签"
+2. 选择目标文件夹
+3. 确认处理
+4. 等待完成
+
+## 提示词模板
+插件支持自定义提示词模板，可以在设置中添加和管理模板：
+- 默认模板
+- 学术总结模板
+- 自定义模板
+
+### 模板变量
+使用 `{text}` 作为原文占位符，系统会自动替换为选中的文本。
+
+## 开发指南
+
+### 环境要求
+- Node.js
+- TypeScript
+- Obsidian API
+
+### 项目结构
+```
+AISmartExtract/
+└── src/
+    ├── main.ts
+    ├── modals/
+    │   └── folderSuggest.ts
+    ├── services/
+    │   ├── aiService.ts
+    │   ├── BatchProcessor.ts
+    │   ├── batchTagService.ts
+    │   ├── noteService.ts
+    │   ├── pdfService.ts
+    │   └── queueService.ts
+    ├── settings/
+    │   ├── settings.ts
+    │   └── settingTab.ts
+    ├── types/
+    │   └── index.ts
+    └── utils/
+        ├── helpers.ts
+        └── textCleaner.ts
+
 ```
 
-### PDF 处理设置
-```typescript
-{
-  "pdfSettings": {
-    "autoProcess": false,    // 是否自动处理选中文本
-    "addBacklinks": false,   // 是否添加反向链接
-    "extractMetadata": true, // 是否提取 PDF 元数据
-    "cleanupMode": "basic"   // 文本清理模式: "basic", "aggressive"
-  }
-}
-```
+### 构建和测试
+```bash
+# 安装依赖
+npm install
 
-### 笔记生成设置
-```typescript
-{
-  "noteTemplate": {
-    "frontMatter": true,     // 是否包含 Front Matter
-    "addTimestamp": true,    // 是否添加时间戳
-    "quoteStyle": "callout", // 引用样式: "callout", "blockquote"
-    "collapsible": true      // 引用块是否可折叠
-  }
-}
-```
+# 开发构建
+npm run dev
 
-## 使用示例
+# 生产构建
+npm run build
 
-### PDF 文本处理
-1. 打开 PDF 文件
-2. 选择需要处理的文本
-3. 使用命令面板或快捷键触发处理
-4. 自动生成包含元数据的智能笔记
-
-### AI 处理
-```typescript
-// 示例：使用不同的 AI 提供商处理文本
-await aiService.processText(text, {
-  provider: "openai",
-  model: "gpt-4",
-  temperature: 0.5
-});
+# 运行测试
+npm test
 ```
 
 ## 注意事项
+- 确保正确配置 AI 服务相关参数
+- 建议定期备份重要笔记
+- 注意模板格式的正确性
 - PDF 文件处理时不会修改原文件
 - API 密钥请妥善保管
 - 建议根据实际需求调整 AI 参数
 - 大文件处理可能需要更长时间
+
+## 贡献指南
+欢迎提交 Pull Request 或提出 Issue。请确保：
+1. 代码符合项目的 TypeScript 规范
+2. 提供充分的测试覆盖
+3. 更新相关文档
+
+
 
 ## 计划功能
 - [ ] 多语言支持
@@ -112,8 +163,6 @@ await aiService.processText(text, {
 - [ ] 高级 PDF 注释功能
 - [ ] 知识图谱集成
 
-## 贡献指南
-欢迎提交 Issue 和 Pull Request！
 
 ## 许可证
 MIT License

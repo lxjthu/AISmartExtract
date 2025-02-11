@@ -1,17 +1,17 @@
 // src/services/noteService.ts
 import { App, TFile, MarkdownView } from 'obsidian';
 import { PluginSettings, PdfSelection } from '../types';
-import { AIService } from './aiService';
+import { AIServiceImpl } from './aiService';
 import { formatDate } from '../utils/helpers';
 
 export class NoteService {
-    private aiService: AIService;
+    private aiService: AIServiceImpl;
 
     constructor(
         private app: App,
         private settings: PluginSettings
     ) {
-        this.aiService = new AIService(settings);
+        this.aiService = new AIServiceImpl(settings);
     }
 
     /**
@@ -20,6 +20,7 @@ export class NoteService {
     async createFromMarkdown(
         text: string, 
         sourceView: MarkdownView,
+        templateId?: string,
         pdfSelection?: PdfSelection
     ) {
         try {
@@ -28,8 +29,17 @@ export class NoteService {
                 throw new Error('Source file is not available.');
             }
     
-            // 获取AI分析结果
-            const aiResult = await this.aiService.processText(text);
+            // 获取模板
+            const template = templateId 
+            ? this.settings.promptTemplates.find(t => t.id === templateId)
+            : null;
+        
+        // 使用选定的模板或默认提示词进行AI处理
+        const aiResult = await this.aiService.processText(
+            text,
+            template?.content, // 将模板内容传递给 AIService
+            undefined               // 第三个参数：模型覆盖（可选）
+        );
     
             // 准备笔记内容
             const noteContent = await this.prepareNoteContent(
