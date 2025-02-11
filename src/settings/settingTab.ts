@@ -2,8 +2,9 @@
 import { App, PluginSettingTab, Setting, Modal,Notice } from 'obsidian';
 import type { TextComponent } from 'obsidian'; // 添加这个导入
 import type AISmartExtractPlugin from '../main';
-import { AIProvider, ProviderSettings,PromptTemplate, PluginSettings } from '../types';
+import { AIProvider, ProviderSettings,PromptTemplate, PluginSettings, SummarySettings } from '../types';
 import { FolderSuggestModal } from '../modals/folderSuggest';
+import { DEFAULT_SETTINGS  } from '../settings/settings';
 export class AISmartExtractSettingTab extends PluginSettingTab {
     plugin: AISmartExtractPlugin;
 
@@ -181,7 +182,67 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // 批量处理设置部分
+                containerEl.createEl('h3', { text: '笔记总结设置' });
+
+            // 添加说明文本
+            const summaryDescEl = containerEl.createEl('p', {
+                text: '自定义总结生成的提示词模板。使用 {count} 表示笔记数量，{notes} 表示笔记内容。'
+            });
+            summaryDescEl.style.fontSize = '12px';
+            summaryDescEl.style.color = 'var(--text-muted)';
+            summaryDescEl.style.marginBottom = '1em';
+
+            // 添加提示词文本区域
+            const summaryPromptArea = containerEl.createEl('textarea', {
+                text: this.plugin.settings.summary.promptTemplate
+            });
+
+            // 设置文本区域样式
+            summaryPromptArea.style.width = '100%';
+            summaryPromptArea.style.height = '200px';
+            summaryPromptArea.style.marginBottom = '1em';
+            summaryPromptArea.style.fontFamily = 'monospace';
+
+            // 添加事件监听
+            summaryPromptArea.addEventListener('change', async (e) => {
+                const target = e.target as HTMLTextAreaElement;
+                this.plugin.settings.summary.promptTemplate = target.value;
+                await this.plugin.saveSettings();
+            });
+
+            // 添加重置按钮
+            new Setting(containerEl)
+                .setName('重置总结提示词')
+                .setDesc('将总结提示词重置为默认值')
+                .addButton(button => button
+                    .setButtonText('重置')
+                    .onClick(async () => {
+                        this.plugin.settings.summary.promptTemplate = DEFAULT_SETTINGS.summary.promptTemplate;
+                        await this.plugin.saveSettings();
+                        summaryPromptArea.value = DEFAULT_SETTINGS.summary.promptTemplate;
+                    }));
+                        
+                new Setting(containerEl)
+                    .setName('包含反向链接')
+                    .setDesc('在原笔记中添加到总结的链接')
+                    .addToggle(toggle => toggle
+                        .setValue(this.plugin.settings.summary.includeBacklinks)
+                        .onChange(async (value) => {
+                            this.plugin.settings.summary.includeBacklinks = value;
+                            await this.plugin.saveSettings();
+                        }));
+                        
+                new Setting(containerEl)
+                    .setName('显示知识图谱')
+                    .setDesc('在总结中包含知识关系图谱')
+                    .addToggle(toggle => toggle
+                        .setValue(this.plugin.settings.summary.knowledgeGraphView)
+                        .onChange(async (value) => {
+                            this.plugin.settings.summary.knowledgeGraphView = value;
+                            await this.plugin.saveSettings();
+                        }));
+        
+                // 批量处理设置部分
         containerEl.createEl('h3', { text: '批量处理设置' });
 
         new Setting(containerEl)
@@ -385,26 +446,37 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
          containerEl.createEl('h3', { text: '命令模板映射' });
          
          // 为每个命令创建模板选择器
-         Object.keys(this.plugin.commands).forEach(commandId => {
-             const command = this.plugin.commands[commandId];
-             new Setting(containerEl)
-                 .setName(command.name)
-                 .addDropdown(dropdown => {
-                     // 添加所有可用模板作为选项
-                     this.plugin.settings.promptTemplates.forEach(template => {
-                         dropdown.addOption(template.id, template.name);
-                     });
-                     // 设置当前选中的模板
-                     dropdown.setValue(
-                         this.plugin.settings.commandTemplateMap[commandId] || 
-                         this.plugin.settings.defaultTemplateId
-                     );
-                     dropdown.onChange(async value => {
-                         this.plugin.settings.commandTemplateMap[commandId] = value;
-                         await this.plugin.saveSettings();
-                     });
-                 });
-         });
+         // 在命令模板映射部分添加特殊处理
+        Object.keys(this.plugin.commands).forEach(commandId => {
+            const command = this.plugin.commands[commandId];
+            
+            // 如果是文件夹总结命令，使用总结提示词而不是普通提示词模板
+            if (commandId === 'generate-folder-summary') {
+                new Setting(containerEl)
+                    .setName(command.name)
+                    .setDesc('使用笔记总结设置中的提示词模板')
+                    .addText(text => text
+                        .setValue('使用笔记总结提示词')
+                        .setDisabled(true));
+            } else {
+                // 其他命令使用正常的模板选择
+                new Setting(containerEl)
+                    .setName(command.name)
+                    .addDropdown(dropdown => {
+                        this.plugin.settings.promptTemplates.forEach(template => {
+                            dropdown.addOption(template.id, template.name);
+                        });
+                        dropdown.setValue(
+                            this.plugin.settings.commandTemplateMap[commandId] || 
+                            this.plugin.settings.defaultTemplateId
+                        );
+                        dropdown.onChange(async value => {
+                            this.plugin.settings.commandTemplateMap[commandId] = value;
+                            await this.plugin.saveSettings();
+                        });
+                    });
+            }
+        });
     }
 
     private async showTemplateEditModal(template?: PromptTemplate) {

@@ -44,6 +44,15 @@ export interface BatchProcessingSettings {
     skipExistingTags: boolean;      // 是否跳过已有标签的文件
 }
 
+//笔记总结接口
+export interface SummarySettings {
+    
+    summaryTemplate: string;
+    includeBacklinks: boolean;
+    knowledgeGraphView: boolean;
+    promptTemplate: string;  // 添加提示词模板设置
+}
+
 // 插件设置接口
 export interface PluginSettings {
     apiKey: string;
@@ -76,6 +85,7 @@ export interface PluginSettings {
     commandTemplateMap: {                   // 命令与模板的映射
         [commandId: string]: string;        // key是命令ID，value是模板ID
     };
+    summary: SummarySettings; // 笔记总结设置
 }
 
 // 提示词模板定义

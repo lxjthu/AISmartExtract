@@ -1,5 +1,5 @@
 // src/settings/settings.ts
-import { PluginSettings,PromptTemplate  } from '../types';
+import { PluginSettings,PromptTemplate,SummarySettings  } from '../types';
 
 // 首先定义默认的提示词模板
 const DEFAULT_TEMPLATES: PromptTemplate[] = [
@@ -146,5 +146,38 @@ export const DEFAULT_SETTINGS: PluginSettings = {
             availableModels: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
             streamingSupport: true
         }
+    },
+
+    summary: {
+        // 移除 summaryFolder 设置
+        summaryTemplate: `# {folderName} 笔记总结
+    
+    ## 核心主题
+    {themes}
+    
+    ## 主要观点
+    {summary}
+    
+    ## 知识结构
+    {structure}
+    
+    ## 包含笔记
+    {noteList}`,
+        includeBacklinks: true,
+        knowledgeGraphView: true,
+        promptTemplate: `请分析以下{count}篇笔记的内容并生成总结：
+    
+    {notes}
+    
+    请提供：
+    1. 3-5个核心主题和关键概念
+    2. 笔记之间的关联性分析
+    3. 主要观点总结（200字以内）
+    4. 建议的知识结构
+    
+    请按照以下格式返回：
+    关键词：主题1，主题2，主题3
+    总结：主要观点总结
+    标签：#领域1 #领域2 #领域3`
     }
-};
+}

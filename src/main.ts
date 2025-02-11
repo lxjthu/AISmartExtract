@@ -11,6 +11,7 @@ import { AIServiceImpl } from './services/aiService';
 import { BatchTagService } from './services/batchTagService';
 import { BatchProcessor } from './services/BatchProcessor';
 import { FolderSuggestModal } from './modals/folderSuggest';
+import { SummaryService } from './services/summaryService';
 
 export default class AISmartExtractPlugin extends Plugin {
     settings: PluginSettings;
@@ -21,6 +22,7 @@ export default class AISmartExtractPlugin extends Plugin {
     private batchTagService: BatchTagService;
     private batchProcessor: BatchProcessor;
     public commands: { [key: string]: ExtendedCommand } = {};
+    private summaryService: SummaryService;
 
 
 
@@ -43,6 +45,8 @@ export default class AISmartExtractPlugin extends Plugin {
             this.batchTagService,
             this.settings
         );
+        this.summaryService = new SummaryService(this.app, this.settings);
+
 
         // 添加设置标签页
         this.addSettingTab(new AISmartExtractSettingTab(this.app, this));
@@ -182,16 +186,49 @@ export default class AISmartExtractPlugin extends Plugin {
                 this.startBatchProcess(templateId);
             }
         };
+
+        // 添加文件夹总结命令
+    // 在 addCommands() 方法中的总结命令处理部分
+        const summaryCommand: ExtendedCommand = {
+            id: 'generate-folder-summary',
+            name: '为文件夹生成笔记总结',
+            callback: () => {
+                new FolderSuggestModal(this.app, async (folderPath) => {
+                    if (!folderPath) {
+                        new Notice('未选择文件夹');
+                        return;
+                    }
+
+                    this.queueService.addTask(
+                        async () => {
+                            new Notice('正在生成文件夹总结...');
+                            const summaryPath = await this.summaryService
+                                .generateFolderSummary(folderPath);
+                            return summaryPath;
+                        },
+                        (path) => new Notice(`成功创建总结：${path}`),
+                        (error) => new Notice(`生成总结失败: ${error.message}`)
+                    );
+                }).open();
+            }
+        };
+
     
         // 存储命令到插件实例中
         this.commands['create-smart-note-from-markdown'] = markdownCommand;
         this.commands['create-smart-note-from-pdf'] = pdfCommand;
         this.commands['batch-process-folder'] = batchCommand;
+        this.commands['generate-folder-summary'] = summaryCommand;
     
-        // 注册命令到 Obsidian
-        this.addCommand(markdownCommand);
-        this.addCommand(pdfCommand);
-        this.addCommand(batchCommand);
+       // 注册所有命令到 Obsidian
+    const allCommands = [
+        markdownCommand,
+        pdfCommand,
+        batchCommand,
+        summaryCommand  // 添加新命令
+    ];
+
+    allCommands.forEach(command => this.addCommand(command));
     }
 
     
