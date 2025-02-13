@@ -1,27 +1,86 @@
 {
-  "id": "obsidian-ai-smart-extract-2.0.1",
-  "name": "AI Smart Extract-2",
-  "version": "2.0.1",
-  "minAppVersion": "1.4.0",
-  "description": "使用AI智能提取文本并创建笔记",
-  "author": "小狼早上好",
-  "authorUrl": "https://github.com/lxjthu",
-  "isDesktopOnly": true,
-  "styles": ["styles.css"],
-  "dependencies": {
-        "pdf": true
+    "id": "obsidian-ai-smart-extract",
+    "name": "AI Smart Extract",
+    "version": "2.0.1",
+    "minAppVersion": "1.4.0",
+    "description": "使用AI智能提取文本并创建笔记，支持多种AI服务，包括批量处理和文件夹总结功能",
+    "author": "小狼早上好",
+    "authorUrl": "https://github.com/lxjthu",
+    "isDesktopOnly": true,
+    "styles": ["styles.css"],
+    "dependencies": {
+      "pdf": true
     },
-  "commands": [
+    "commands": [
       {
-          "id": "create-smart-note-from-markdown",
-          "name": "从Markdown选中文本创建智能笔记",
-          "icon": "document"
+        "id": "create-smart-note-from-markdown",
+        "name": "从Markdown选中文本创建智能笔记",
+        "icon": "document"
       },
       {
-          "id": "create-smart-note-from-pdf",
-          "name": "从PDF选中文本创建智能笔记",
-          "icon": "pdf-file",
-          "checkCallback": true   
+        "id": "create-smart-note-from-pdf",
+        "name": "从PDF选中文本创建智能笔记",
+        "icon": "file-pdf",
+        "checkCallback": true
+      },
+      {
+        "id": "batch-process-folder",
+        "name": "批量处理文件夹中的笔记添加智能标签",
+        "icon": "folder",
+        "checkCallback": true
+      },
+      {
+        "id": "generate-folder-summary",
+        "name": "为文件夹生成笔记总结",
+        "icon": "list",
+        "checkCallback": true
+      },
+      {
+        "id": "manage-prompt-templates",
+        "name": "管理提示词模板",
+        "icon": "template",
+        "checkCallback": true
       }
-  ]
-}
+    ],
+    "settings": {
+      "ai-service": {
+        "type": "dropdown",
+        "default": "openai",
+        "options": [
+          "openai",
+          "azure-openai",
+          "anthropic",
+          "gemini",
+          "tongyi",
+          "deepseek",
+          "mistral",
+          "wenxin",
+          "xunfei",
+          "chatglm",
+          "minimax",
+          "moonshot"
+        ]
+      },
+      "target-folder": {
+        "type": "folder",
+        "default": ""
+      },
+      "link-style": {
+        "type": "dropdown",
+        "default": "wiki",
+        "options": ["wiki", "reference"]
+      },
+      "quote-style": {
+        "type": "dropdown",
+        "default": "blockquote",
+        "options": ["blockquote", "codeblock"]
+      },
+      "batch-concurrent": {
+        "type": "number",
+        "default": 3,
+        "min": 1,
+        "max": 10
+      }
+    }
+  }
+  

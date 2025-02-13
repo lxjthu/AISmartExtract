@@ -32,7 +32,8 @@ export class PDFService {
                 cleanedText,                          // 第一个参数：清理后的文本
                 view as unknown as MarkdownView,      // 第二个参数：视图
                 undefined,                            // 第三个参数：模板ID（如果不需要可以传undefined）
-                selection                            // 第四个参数：PDF选择信息
+                selection,                            // 第四个参数：PDF选择信息
+                'tag'
             );
 
             new Notice('笔记创建成功！');

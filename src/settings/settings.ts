@@ -1,11 +1,14 @@
 // src/settings/settings.ts
-import { PluginSettings,PromptTemplate,SummarySettings  } from '../types';
+import { PluginSettings,PromptTemplate,SummarySettings,AIResponseType} from '../types';
 
 // 首先定义默认的提示词模板
+// settings.ts
 const DEFAULT_TEMPLATES: PromptTemplate[] = [
     {
-        id: 'default',
-        name: '默认提示词',
+        id: 'default-tag',
+        name: '默认标签提取',
+        type: 'tag',
+        description: '提取文本的关键词、总结和标签',
         content: `请分析以下文本，提供：
 1. 3-5个关键词
 2. 一句话总结（15字以内，不要加句号）
@@ -17,27 +20,26 @@ const DEFAULT_TEMPLATES: PromptTemplate[] = [
 标签：#标签1 #标签2 #标签3
 
 原文：
-{text}`,
-        description: '默认的提示词模板'
+{text}`
     },
+    
     {
-        id: 'academic',
-        name: '学术总结',
-        content: `请分析以下学术文本，提供：
-1. 3-5个学术关键词
-2. 研究主要发现（20字以内）
-3. 相关学术领域标签
+        id: 'default-summary',
+        name: '默认文件夹总结',
+        type: 'summary', 
+        description: '生成文件夹内容的综合总结',
+        content: `请分析以下{count}篇笔记的内容并生成总结：
 
-格式：
-关键词：关键词1，关键词2，关键词3
-总结：主要研究发现
-标签：#领域1 #领域2 #领域3
+{notes}
 
-原文：
-{text}`,
-        description: '适用于学术文献的总结模板'
+请分析上述内容,并按照以下严格格式返回(注意:冒号后需要空格,逗号使用中文逗号):
+
+关键词：主题1，主题2，主题3
+总结：请在此处提供200字以内的主要观点总结
+标签：#领域1 #领域2 #领域3`
     }
 ];
+
 
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -73,12 +75,76 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     },
     // 新的提示词模板系统
     promptTemplates: DEFAULT_TEMPLATES,
-    defaultTemplateId: 'default',
-    commandTemplateMap: {},
+    defaultTemplateId: 'default-tag',
+    // 命令与模板ID的映射
+    commandTemplateMap: {
+        'create-smart-note-from-markdown': 'default-tag',
+        'create-smart-note-from-pdf': 'default-tag',
+        'batch-process-folder': 'default-tag',
+        'generate-folder-summary': 'default-summary',
+    },
 
     // 保留现有的promptTemplate和defaultPrompt以保持向后兼容
     promptTemplate: DEFAULT_TEMPLATES[0].content,
     defaultPrompt: DEFAULT_TEMPLATES[0].content,
+
+    metadata: {
+        configs: [
+            {
+                key: 'category',
+                description: '根据文本内容判断笔记的主要类别',
+                type: 'ai',
+                required: true,
+                prompt: '请分析文本内容，提取一个最合适的类别标签。返回格式：类别名称'
+            },
+            {
+                key: 'topics',
+                description: '提取文本中讨论的主要主题',
+                type: 'ai',
+                required: true,
+                prompt: '请从文本中提取3-5个主要讨论的主题。返回格式：["主题1", "主题2", "主题3"]'
+            },
+            {
+                key: 'summary',
+                description: '生成文本的简短总结',
+                type: 'ai',
+                required: true,
+                prompt: '请用20字以内对文本内容进行总结。返回格式：一句话总结'
+            },
+            {
+                key: 'created',
+                description: '文件创建时间',
+                type: 'system',
+                required: true,
+                systemField: 'created'
+            },
+            {
+                key: 'modified',
+                description: '文件最后修改时间',
+                type: 'system',
+                required: true,
+                systemField: 'modified'
+            },
+        ],
+        skipExisting: true,
+        batchProcessing: {
+            enabled: true,
+            maxConcurrent: 3,
+            delayBetweenFiles: 1000
+        },
+       
+        dateFormat: 'YYYY-MM-DD HH:mm:ss',  // 添加日期格式设置
+        includeTimestamp: true,  // 是否同时包含时间戳
+    },
+    commandResponseTypes: {
+        'create-smart-note-from-markdown': 'tag',
+        'create-smart-note-from-pdf': 'tag',
+        'batch-process-folder': 'tag',
+        'generate-folder-summary': 'summary',
+    },
+
+
+
 
     // 扩展 providerSettings
     providerSettings: {
@@ -162,10 +228,11 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     {structure}
     
     ## 包含笔记
-    {noteList}`,
+{noteList}`,
         includeBacklinks: true,
         knowledgeGraphView: true,
-        promptTemplate: `请分析以下{count}篇笔记的内容并生成总结：
+        // 使用 DEFAULT_TEMPLATES 中的 summary 模板
+        promptTemplate: DEFAULT_TEMPLATES.find(t => t.id === 'default-summary')?.content || `请分析以下{count}篇笔记的内容并生成总结：
     
     {notes}
     

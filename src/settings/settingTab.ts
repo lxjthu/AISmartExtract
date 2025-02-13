@@ -2,9 +2,10 @@
 import { App, PluginSettingTab, Setting, Modal,Notice } from 'obsidian';
 import type { TextComponent } from 'obsidian'; // 添加这个导入
 import type AISmartExtractPlugin from '../main';
-import { AIProvider, ProviderSettings,PromptTemplate, PluginSettings, SummarySettings } from '../types';
+import { AIProvider, ProviderSettings,PromptTemplate, PluginSettings, SummarySettings, MetadataField } from '../types';
 import { FolderSuggestModal } from '../modals/folderSuggest';
 import { DEFAULT_SETTINGS  } from '../settings/settings';
+import { config } from 'process';
 export class AISmartExtractSettingTab extends PluginSettingTab {
     plugin: AISmartExtractPlugin;
 
@@ -277,7 +278,45 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
         
-                // PDF 设置
+    containerEl.createEl('h3', { text: '元数据设置' });
+    
+        // 添加重置元数据提示词按钮
+        new Setting(containerEl)
+        .setName('重置元数据提示词')
+        .setDesc('将元数据提示词重置为默认值')
+        .addButton(button => button
+            .setButtonText('重置')
+            .onClick(async () => {
+                this.resetMetadataPrompts();
+            }));
+    this.addMetadataField(containerEl);
+
+    
+            // 时间格式设置
+    containerEl.createEl('h3', { text: '时间元数据设置' });
+    new Setting(containerEl)
+        .setName('日期时间格式')
+        .setDesc('设置创建时间和修改时间的显示格式')
+        .addText(text => text
+            .setPlaceholder('YYYY-MM-DD HH:mm:ss')
+            .setValue(this.plugin.settings.metadata.dateFormat || 'YYYY-MM-DD HH:mm:ss')
+            .onChange(async (value) => {
+                this.plugin.settings.metadata.dateFormat = value;
+                await this.plugin.saveSettings();
+            }));
+
+    new Setting(containerEl)
+        .setName('包含时间戳')
+        .setDesc('同时保存时间戳形式的创建和修改时间')
+        .addToggle(toggle => toggle
+            .setValue(this.plugin.settings.metadata.includeTimestamp || false)
+            .onChange(async (value) => {
+                this.plugin.settings.metadata.includeTimestamp = value;
+                await this.plugin.saveSettings();
+            }));
+  
+            
+            // PDF 设置
         containerEl.createEl('h3', { text: 'PDF 设置' });
 
         new Setting(containerEl)
@@ -447,36 +486,65 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
          
          // 为每个命令创建模板选择器
          // 在命令模板映射部分添加特殊处理
+        // 在 settingTab.ts 中的 display() 方法中修改命令模板映射部分
         Object.keys(this.plugin.commands).forEach(commandId => {
+            // 跳过元数据相关命令的模板映射
+        if (commandId === 'add-smart-metadata' || 
+            commandId === 'batch-add-smart-metadata') {
+            return;
+        }
             const command = this.plugin.commands[commandId];
-            
-            // 如果是文件夹总结命令，使用总结提示词而不是普通提示词模板
-            if (commandId === 'generate-folder-summary') {
-                new Setting(containerEl)
-                    .setName(command.name)
-                    .setDesc('使用笔记总结设置中的提示词模板')
-                    .addText(text => text
-                        .setValue('使用笔记总结提示词')
-                        .setDisabled(true));
-            } else {
-                // 其他命令使用正常的模板选择
-                new Setting(containerEl)
-                    .setName(command.name)
-                    .addDropdown(dropdown => {
-                        this.plugin.settings.promptTemplates.forEach(template => {
-                            dropdown.addOption(template.id, template.name);
-                        });
-                        dropdown.setValue(
-                            this.plugin.settings.commandTemplateMap[commandId] || 
-                            this.plugin.settings.defaultTemplateId
-                        );
-                        dropdown.onChange(async value => {
-                            this.plugin.settings.commandTemplateMap[commandId] = value;
-                            await this.plugin.saveSettings();
-                        });
+            const container = containerEl.createDiv('command-settings');
+
+            new Setting(container)
+                .setName(command.name)
+                .setDesc('选择命令使用的模板和响应类型')
+                .addDropdown(dropdown => {
+                    // 获取命令的响应类型，如果没有设置则使用默认值
+                    const responseType = this.plugin.settings.commandResponseTypes[commandId] || 'tag';
+                    
+                    // 获取该响应类型的所有可用模板
+                    const availableTemplates = this.plugin.settings.promptTemplates
+                        .filter(t => t.type === responseType);
+                    
+                    // 如果没有可用模板，添加一个默认模板
+                    if (availableTemplates.length === 0) {
+                        const defaultTemplate: PromptTemplate = {
+                            id: `default-${responseType}`,
+                            name: `默认${responseType}模板`,
+                            content: this.plugin.settings.defaultPrompt,
+                            type: responseType,
+                            description: '默认模板'
+                        };
+                        this.plugin.settings.promptTemplates.push(defaultTemplate);
+                        availableTemplates.push(defaultTemplate);
+                    }
+                    
+                    // 添加所有可用模板到下拉列表
+                    availableTemplates.forEach(template => {
+                        dropdown.addOption(template.id, template.name);
                     });
-            }
+                    
+                    // 设置当前选中的模板
+                    const currentTemplateId = this.plugin.settings.commandTemplateMap[commandId] || 
+                                        availableTemplates[0].id;
+                    dropdown.setValue(currentTemplateId);
+                    
+                    dropdown.onChange(async value => {
+                        this.plugin.settings.commandTemplateMap[commandId] = value;
+                        await this.plugin.saveSettings();
+                    });
+                });
         });
+
+    }
+
+    private resetMetadataPrompts() {
+        this.plugin.settings.metadata.configs = DEFAULT_SETTINGS.metadata.configs.map(config => ({
+            ...config
+        }));
+        this.plugin.saveSettings();
+        this.display();
     }
 
     private async showTemplateEditModal(template?: PromptTemplate) {
@@ -502,6 +570,59 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
         );
         modal.open();
     }
+    
+    // 在 AISmartExtractSettingTab 类中添加新方法
+    // 在 settingTab.ts 中的使用方式
+    private addMetadataField(containerEl: HTMLElement) {
+        new Setting(containerEl)
+            .setName('添加元数据字段')
+            .setDesc('配置新的元数据字段')
+            .addButton(button => button
+                .setButtonText('添加字段')
+                .onClick(() => {
+                    const modal = new MetadataFieldModal(this.app, async (field: MetadataField) => {
+                        this.plugin.settings.metadata.configs.push(field);
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+                    modal.open();
+                }));
+    
+
+        // 编辑现有字段
+        this.plugin.settings.metadata.configs.forEach((field, index) => {
+            const fieldContainer = containerEl.createDiv('metadata-field');
+            
+            new Setting(fieldContainer)
+                .setName(field.key)
+                .setDesc(field.type === 'ai' ? (field.prompt ?? '') : (field.description ?? ''))
+                .addButton(button => button
+                    .setIcon('pencil')
+                    .onClick(() => {
+                        const modal = new MetadataFieldModal(
+                            this.app, 
+                            async (updatedField: MetadataField) => {
+                                this.plugin.settings.metadata.configs[index] = updatedField;
+                                await this.plugin.saveSettings();
+                                this.display();
+                            },
+                            field // 传递现有字段对象
+                        );
+                        modal.open();
+                    }))
+                .addButton(button => button
+                    .setIcon('trash')
+                    .onClick(async () => {
+                        this.plugin.settings.metadata.configs.splice(index, 1);
+                        await this.plugin.saveSettings();
+                        this.display();
+                    }));
+        });
+    }
+
+
+
+
     private renderProviderSpecificSettings(containerEl: HTMLElement) {
         const provider = this.plugin.settings.aiProvider;
         const providerSettings = this.plugin.settings.providerSettings[provider];
@@ -551,6 +672,107 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
     }
 }
 
+//元数据配置弹窗
+class MetadataFieldModal extends Modal {
+    private field: MetadataField;
+    private onSubmit: (field: MetadataField) => void;
+
+    constructor(app: App, onSubmit: (field: MetadataField) => void, field?: MetadataField) {
+        super(app);
+        this.onSubmit = onSubmit;
+        this.field = field || {
+            key: '',
+            type: 'ai',
+            description: '',
+            required: true,
+            prompt: '' // 确保包含所有可能的字段
+        };
+    }
+
+    onOpen() {
+        const {contentEl} = this;
+        contentEl.empty();
+
+        contentEl.createEl('h3', { text: this.field.key ? '编辑元数据字段' : '添加元数据字段' });
+
+        // 字段名称
+        new Setting(contentEl)
+            .setName('字段名称')
+            .setDesc('输入字段的标识符')
+            .addText(text => text
+                .setPlaceholder('field_name')
+                .setValue(this.field.key)
+                .onChange(value => this.field.key = value));
+
+        // 字段类型
+        new Setting(contentEl)
+            .setName('字段类型')
+            .setDesc('选择字段的类型')
+            .addDropdown(dropdown => {
+                dropdown
+                    .addOption('ai', 'AI分析字段')
+                    .addOption('system', '系统字段')
+                    .addOption('custom', '自定义字段')
+                    .setValue(this.field.type)
+                    .onChange(value => {
+                        this.field.type = value as MetadataField['type'];
+                        // 如果是 AI 字段，显示提示词输入
+                        if (value === 'ai') {
+                            this.showPromptInput();
+                        }
+                    });
+            });
+
+        // 字段描述
+        new Setting(contentEl)
+            .setName('字段描述')
+            .setDesc('字段的描述信息')
+            .addTextArea(text => text
+                .setPlaceholder('描述该字段的用途...')
+                .onChange(value => this.field.description = value));
+
+        // 是否必填
+        new Setting(contentEl)
+            .setName('必填字段')
+            .setDesc('是否为必填字段')
+            .addToggle(toggle => toggle
+                .setValue(this.field.required ?? true)
+                .onChange(value => this.field.required = value));
+
+            // AI 提示词（仅当字段类型为 AI 时显示）
+        if (this.field.type === 'ai') {
+            this.showPromptInput();
+        }
+
+        // 保存按钮
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText('保存')
+                .onClick(() => {
+                    this.onSubmit(this.field);
+                    this.close();
+                }))
+            .addButton(btn => btn
+                .setButtonText('取消')
+                .onClick(() => this.close()));
+    }
+
+    private showPromptInput() {
+        const promptSetting = new Setting(this.contentEl)
+        .setName('AI 提示词')
+        .setDesc('设置 AI 分析该字段的提示词')
+        .addTextArea(text => text
+            .setPlaceholder('请输入提示词...')
+            .setValue(this.field.prompt || '')
+            .onChange(value => this.field.prompt = value));
+    }
+
+    onClose() {
+        const {contentEl} = this;
+        contentEl.empty();
+    }
+}
+
 // 模板编辑弹窗
 class TemplateEditModal extends Modal {
     private template: PromptTemplate;
@@ -566,7 +788,8 @@ class TemplateEditModal extends Modal {
             id: '',
             name: '',
             content: '',
-            description: ''
+            description: '',
+            type: 'metadata' // 默认模板类型
         };
         this.onSubmit = onSubmit;
     }

@@ -6,6 +6,53 @@ export interface ExtendedCommand extends Command {
     name: string;
 }
 
+//不同类型AI响应接口
+export type AIResponseType = 'tag' | 'metadata' | 'summary';
+// 基础响应接口
+export interface BaseAIResponse {
+    type: AIResponseType;
+}
+
+// 标签响应
+export interface TagAIResponse extends BaseAIResponse {
+    type: 'tag';
+    keywords: string[];
+    summary: string;
+    tags: string[];
+}
+export type MetadataFieldType = 'ai' | 'system' | 'custom' | 'string' | 'number' | 'string[]' | 'date';
+
+export interface MetadataField {
+    key: string;
+    type:  MetadataFieldType;
+    required: boolean;
+    prompt?: string;     // AI 提示词
+    description?: string; // AI 生成的描述，可选
+    systemField?: 'created' | 'modified'; // system 类型特有的字段
+}
+
+// 元数据响应
+export interface MetadataAIResponse {
+    type: 'metadata';
+    fields: Record<string, any>;
+    category?: string;
+    topics?: string[];
+    summary?: string;
+    keywords?: string[];
+    [key: string]: any;  // 允许任意字符串索引
+}
+
+// 文件夹总结响应
+export interface SummaryAIResponse extends BaseAIResponse {
+    type: 'summary';
+    themes: string[];
+    summary: string;
+    structure: string;
+    tags: string[];
+}
+
+export type AIResponse = TagAIResponse | MetadataAIResponse | SummaryAIResponse;
+
 
 // 扩展 AI 提供商类型
 export type AIProvider = 
@@ -53,6 +100,32 @@ export interface SummarySettings {
     promptTemplate: string;  // 添加提示词模板设置
 }
 
+// 元数据配置接口
+export type MetadataConfig = MetadataField;
+
+// 元数据处理设置
+export interface MetadataProcessingSettings {
+    configs: MetadataField[];        // 使用统一的 MetadataField 类型
+    skipExisting: boolean;
+    batchProcessing: {
+        enabled: boolean;
+        maxConcurrent: number;
+        delayBetweenFiles: number;
+    };
+    dateFormat: string;
+    includeTimestamp: boolean;
+}
+
+// 可选：添加系统元数据类型
+
+export interface SystemMetadata {
+    created: string;
+    modified: string;
+    createdTimestamp?: number;
+    modifiedTimestamp?: number;
+    [key: string]: any; // 添加字符串索引签名
+}
+
 // 插件设置接口
 export interface PluginSettings {
     apiKey: string;
@@ -86,6 +159,10 @@ export interface PluginSettings {
         [commandId: string]: string;        // key是命令ID，value是模板ID
     };
     summary: SummarySettings; // 笔记总结设置
+    metadata: MetadataProcessingSettings; // 元数据处理设置
+    commandResponseTypes: {
+        [commandId: string]: AIResponseType;
+    };
 }
 
 // 提示词模板定义
@@ -94,21 +171,19 @@ export interface PromptTemplate {
     name: string;         // 模板名称
     content: string;      // 模板内容
     description?: string; // 模板描述（可选）
+    type: 'tag' | 'metadata' | 'summary'; // 添加 type 属性并定义其可能的值
 }
 
-// AI响应接口
-export interface AIResponse {
-    keywords: string[];
-    summary: string;
-    tags: string[];
-}
+
 
 // AI服务接口
 export interface AIService {
     processText(
         text: string,
         templateContent?: string,
-        modelOverride?: string
+        modelOverride?: string,
+        responseType?: AIResponseType,
+        metadataFields?: MetadataField[]
     ): Promise<AIResponse>;
 }
 

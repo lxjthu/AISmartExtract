@@ -1,6 +1,6 @@
 // src/services/noteService.ts
 import { App, TFile, MarkdownView } from 'obsidian';
-import { PluginSettings, PdfSelection } from '../types';
+import { PluginSettings, PdfSelection, TagAIResponse, AIResponseType } from '../types';
 import { AIServiceImpl } from './aiService';
 import { formatDate } from '../utils/helpers';
 
@@ -21,7 +21,8 @@ export class NoteService {
         text: string, 
         sourceView: MarkdownView,
         templateId?: string,
-        pdfSelection?: PdfSelection
+        pdfSelection?: PdfSelection,
+        responseType: AIResponseType = 'tag'  // 添加响应类型参数，设置默认值
     ) {
         try {
             // 检查 sourceView.file 是否存在
@@ -38,16 +39,21 @@ export class NoteService {
         const aiResult = await this.aiService.processText(
             text,
             template?.content, // 将模板内容传递给 AIService
-            undefined               // 第三个参数：模型覆盖（可选）
+            undefined,               // 第三个参数：模型覆盖（可选）
+            'tag'
         );
     
-            // 准备笔记内容
-            const noteContent = await this.prepareNoteContent(
-                text,
-                aiResult,
-                sourceView.file,
-                pdfSelection
-            );
+        if (aiResult.type !== 'tag') {
+            throw new Error('收到了错误的响应类型');
+        }
+    
+        // 后续使用 aiResult 时确保类型安全
+        const noteContent = await this.prepareNoteContent(
+            text,
+            aiResult,  // 现在 TypeScript 知道这是 TagAIResponse 类型
+            sourceView.file,
+            pdfSelection
+        );
     
             // 创建新笔记并获取文件引用
             const fileName = this.generateFileName(aiResult.summary);
@@ -74,7 +80,7 @@ export class NoteService {
      */
     private async prepareNoteContent(
         text: string,
-        aiResult: { keywords: string[]; summary: string; tags: string[] },
+        aiResult: TagAIResponse,  // 明确指定为 TagAIResponse
         sourceFile: TFile,
         pdfInfo?: PdfSelection
     ): Promise<string> {
@@ -181,7 +187,7 @@ export class NoteService {
         }
 
         // 创建文件
-        const filePath = `${targetFolder}/${fileName}.md`;
+        const filePath = `${targetFolder}/${fileName}`;
         const file = await this.app.vault.create(filePath, content);
         return file;
     }

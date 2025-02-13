@@ -12,6 +12,7 @@ import { BatchTagService } from './services/batchTagService';
 import { BatchProcessor } from './services/BatchProcessor';
 import { FolderSuggestModal } from './modals/folderSuggest';
 import { SummaryService } from './services/summaryService';
+import { MetadataService } from './services/metadataService';
 
 export default class AISmartExtractPlugin extends Plugin {
     settings: PluginSettings;
@@ -23,6 +24,7 @@ export default class AISmartExtractPlugin extends Plugin {
     private batchProcessor: BatchProcessor;
     public commands: { [key: string]: ExtendedCommand } = {};
     private summaryService: SummaryService;
+    private metadataService: MetadataService;
 
 
 
@@ -39,13 +41,16 @@ export default class AISmartExtractPlugin extends Plugin {
             this.noteService,
             this.aiService
         );
+        this.metadataService = new MetadataService(this.app, this.settings, this.aiService);
         this.batchTagService = new BatchTagService(this.app, this.settings);
         this.batchProcessor = new BatchProcessor(
             this.queueService,
             this.batchTagService,
-            this.settings
+            this.settings,
+            this.metadataService
         );
         this.summaryService = new SummaryService(this.app, this.settings);
+        
 
 
         // 添加设置标签页
@@ -126,16 +131,18 @@ export default class AISmartExtractPlugin extends Plugin {
                     new Notice('请先选择一段文本');
                     return;
                 }
-    
+        
                 // 获取命令对应的模板ID
                 const templateId = this.settings.commandTemplateMap['create-smart-note-from-markdown'] || 
                                  this.settings.defaultTemplateId;
-    
+        
                 this.queueService.addTask(
                     async () => await this.noteService.createFromMarkdown(
                         selectedText, 
                         view,
-                        templateId  // 传递模板ID
+                        templateId,
+                        undefined,  // pdfSelection 参数
+                        'tag'      // 明确指定响应类型为 'tag'
                     ),
                     () => new Notice('笔记创建成功！'),
                     (error) => new Notice('处理失败: ' + error.message)
@@ -158,15 +165,14 @@ export default class AISmartExtractPlugin extends Plugin {
                 if (checking) {
                     return true;
                 }
-    
+        
                 // 获取命令对应的模板ID
                 const templateId = this.settings.commandTemplateMap['create-smart-note-from-pdf'] || 
                                  this.settings.defaultTemplateId;
         
                 this.queueService.addTask(
                     async () => await this.pdfService.handlePdfSelection(
-                        activeView,
-                        
+                        activeView
                     ),
                     undefined,
                     (error) => new Notice('处理PDF选择时出错: ' + error.message)
@@ -189,29 +195,175 @@ export default class AISmartExtractPlugin extends Plugin {
 
         // 添加文件夹总结命令
     // 在 addCommands() 方法中的总结命令处理部分
-        const summaryCommand: ExtendedCommand = {
-            id: 'generate-folder-summary',
-            name: '为文件夹生成笔记总结',
+    const summaryCommand: ExtendedCommand = {
+        id: 'generate-folder-summary',
+        name: '为文件夹生成笔记总结',
+        callback: () => {
+            // 添加调试日志：显示当前使用的模板
+            console.log('Summary command templates:', {
+                defaultTemplate: this.settings.promptTemplates.find(
+                    t => t.id === 'default-summary'
+                ),
+                mappedTemplate: this.settings.promptTemplates.find(
+                    t => t.id === this.settings.commandTemplateMap['generate-folder-summary']
+                ),
+                summarySettings: this.settings.summary
+            });
+    
+            new FolderSuggestModal(this.app, async (folderPath) => {
+                if (!folderPath) {
+                    new Notice('未选择文件夹');
+                    return;
+                }
+    
+                console.log('Selected folder for summary:', folderPath);
+    
+                this.queueService.addTask(
+                    async () => {
+                        new Notice('正在生成文件夹总结...');
+                        console.log('Starting folder summary generation...');
+                        
+                        const summaryPath = await this.summaryService
+                            .generateFolderSummary(folderPath);
+                        
+                        console.log('Summary generation completed:', {
+                            path: summaryPath,
+                            template: this.settings.summary.promptTemplate
+                        });
+                        
+                        return summaryPath;
+                    },
+                    (path) => {
+                        console.log('Summary created successfully at:', path);
+                        new Notice(`成功创建总结：${path}`);
+                    },
+                    (error) => {
+                        console.error('Summary generation failed:', error);
+                        new Notice(`生成总结失败: ${error.message}`);
+                    }
+                );
+            }).open();
+        }
+    };
+    
+
+        // 单文件元数据处理命令
+        const metadataCommand: ExtendedCommand = {
+            id: 'add-smart-metadata',
+            name: '添加智能元数据',
+            editorCallback: async (editor, view: MarkdownView) => {
+                if (!view.file) {
+                    new Notice('当前视图没有关联文件');
+                    return;
+                }
+
+                // 验证元数据配置
+                const aiFields = this.settings.metadata.configs.filter(field => field.type === 'ai');
+                if (aiFields.length === 0) {
+                    new Notice('未配置任何 AI 元数据字段');
+                    return;
+                }
+
+                // 验证 AI 字段是否都有提示词
+                const missingPrompts = aiFields.filter(field => !field.prompt);
+                if (missingPrompts.length > 0) {
+                    new Notice(`以下字段缺少 AI 提示词：${missingPrompts.map(f => f.key).join(', ')}`);
+                    return;
+                }
+
+                // 显示处理状态
+                const statusBar = this.addStatusBarItem();
+                statusBar.setText('正在处理元数据...');
+
+                try {
+                    await this.queueService.addTask(
+                        async () => {
+                            await this.metadataService.processFile(view.file!);
+                        },
+                        () => {
+                            new Notice('元数据添加成功！');
+                            statusBar.setText('元数据处理完成');
+                            setTimeout(() => statusBar.remove(), 3000);
+                        },
+                        (error) => {
+                            new Notice('处理失败: ' + error.message);
+                            statusBar.setText('元数据处理失败');
+                            setTimeout(() => statusBar.remove(), 3000);
+                        }
+                    );
+                } catch (error) {
+                    console.error('元数据处理错误:', error);
+                    new Notice('处理过程中发生错误');
+                    statusBar.remove();
+                }
+            }
+        };
+
+        // 批量元数据处理命令
+        const batchMetadataCommand: ExtendedCommand = {
+            id: 'batch-add-smart-metadata',
+            name: '批量添加智能元数据',
             callback: () => {
+                // 验证元数据配置
+                const aiFields = this.settings.metadata.configs.filter(field => field.type === 'ai');
+                if (aiFields.length === 0) {
+                    new Notice('未配置任何 AI 元数据字段');
+                    return;
+                }
+
+                // 显示当前配置状态
+                console.log('元数据批处理配置:', {
+                    aiFields: aiFields.map(f => ({
+                        key: f.key,
+                        description: f.description
+                    })),
+                    batchSettings: this.settings.metadata.batchProcessing,
+                    skipExisting: this.settings.metadata.skipExisting,
+                    dateFormat: this.settings.metadata.dateFormat
+                });
+
                 new FolderSuggestModal(this.app, async (folderPath) => {
                     if (!folderPath) {
                         new Notice('未选择文件夹');
                         return;
                     }
 
-                    this.queueService.addTask(
-                        async () => {
-                            new Notice('正在生成文件夹总结...');
-                            const summaryPath = await this.summaryService
-                                .generateFolderSummary(folderPath);
-                            return summaryPath;
-                        },
-                        (path) => new Notice(`成功创建总结：${path}`),
-                        (error) => new Notice(`生成总结失败: ${error.message}`)
-                    );
+                    const files = await this.batchTagService.getMarkdownFiles(folderPath);
+                    
+                    if (files.length === 0) {
+                        new Notice('所选文件夹中没有 Markdown 文件');
+                        return;
+                    }
+
+                    // 显示处理状态
+                    const statusBar = this.addStatusBarItem();
+                    statusBar.setText(`准备处理 ${files.length} 个文件...`);
+
+                    try {
+                        console.log(`开始批量处理文件夹: ${folderPath}`, {
+                            fileCount: files.length,
+                            files: files.map(f => f.path)
+                        });
+
+                        await this.batchProcessor.processMetadata(files);
+                        
+                        statusBar.setText('批量处理完成');
+                        setTimeout(() => statusBar.remove(), 3000);
+                        
+                        new Notice(`成功处理 ${files.length} 个文件的元数据`);
+                    } catch (error) {
+                        console.error('批量处理错误:', error);
+                        statusBar.setText('批量处理失败');
+                        setTimeout(() => statusBar.remove(), 3000);
+                        new Notice('批量处理过程中发生错误');
+                    }
                 }).open();
             }
         };
+
+
+
+    
 
     
         // 存储命令到插件实例中
@@ -219,13 +371,17 @@ export default class AISmartExtractPlugin extends Plugin {
         this.commands['create-smart-note-from-pdf'] = pdfCommand;
         this.commands['batch-process-folder'] = batchCommand;
         this.commands['generate-folder-summary'] = summaryCommand;
+        this.commands['add-smart-metadata'] = metadataCommand;
+        this.commands['batch-add-smart-metadata'] = batchMetadataCommand;
     
        // 注册所有命令到 Obsidian
     const allCommands = [
         markdownCommand,
         pdfCommand,
         batchCommand,
-        summaryCommand  // 添加新命令
+        summaryCommand,  // 添加新命令
+        metadataCommand,
+        batchMetadataCommand
     ];
 
     allCommands.forEach(command => this.addCommand(command));

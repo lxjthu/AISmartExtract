@@ -1,7 +1,7 @@
 // src/services/batchTagService.ts
 import { App, TFile, Notice } from 'obsidian';
 import { AIServiceImpl } from './aiService';
-import { PluginSettings } from '../types';
+import { PluginSettings,TagAIResponse } from '../types';
 
 export class BatchTagService {
     private aiService: AIServiceImpl;
@@ -60,7 +60,16 @@ export class BatchTagService {
         const mainContent = this.extractMainContent(content);
         
         // 使用 AI 生成标签
-        const aiResult = await this.aiService.processText(mainContent);
+        const aiResult = await this.aiService.processText(
+            mainContent,
+            undefined,
+            undefined,
+            'tag'  // 指定响应类型
+        );
+
+        if (aiResult.type !== 'tag') {
+            throw new Error('收到了错误的响应类型');
+        }
         
         // 更新文件
         await this.updateFileTags(file, content, aiResult.tags);
