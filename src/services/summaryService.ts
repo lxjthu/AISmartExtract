@@ -70,10 +70,13 @@ export class SummaryService {
     
             // 8. 保存总结文件
             const folderName = folderPath.split('/').pop() || 'folder';
-            const summaryFileName = `${folderName}-总结.md`;  // 添加 .md 扩展名
+            const summaryFileName = `${folderName}-总结.md`;
             const summaryFilePath = `${folderPath}/${summaryFileName}`;
     
-            await this.app.vault.create(summaryFilePath, summaryContent);
+            const newFile = await this.app.vault.create(summaryFilePath, summaryContent);
+            
+            // 使用新的 API 打开文件
+            await this.app.workspace.getLeaf().openFile(newFile);
     
             return summaryFilePath;
         } catch (error) {
@@ -219,7 +222,6 @@ private async generateFolderStructure(folderPath: string): Promise<string> {
     buildStructure(folder);
     return structure.join('\n');
 }
-
     
 private formatSummaryNote(
     summary: SummaryAIResponse,

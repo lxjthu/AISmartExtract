@@ -16,7 +16,7 @@ import {
 export class AIServiceImpl implements AIService  {
 
     // 在这里添加调试开关，类的成员变量区域
-    private readonly DEBUG = true;
+    private readonly DEBUG = false;
     
     // 添加日志方法
     private log(message: string, ...args: any[]) {
