@@ -19,6 +19,11 @@ export class BatchProcessor {
      * 处理批量文件
      */
     async processBatchFiles(files: TFile[], type: AIResponseType = 'tag'): Promise<void> {
+        // 添加确认对话框
+        if (!await this.showConfirmationDialog(files.length)) {
+            return;
+        }
+
         const settings = type === 'metadata' ? 
             this.settings.metadata.batchProcessing : 
             this.settings.batchProcessing;
@@ -71,6 +76,11 @@ export class BatchProcessor {
 
     //批量添加元数据
     async processMetadata(files: TFile[]): Promise<void> {
+        // 添加确认对话框
+        if (!await this.showConfirmationDialog(files.length)) {
+            return;
+        }
+
         const { maxConcurrent, delayBetweenFiles } = 
             this.settings.metadata.batchProcessing;
 
@@ -111,7 +121,31 @@ export class BatchProcessor {
             this.showCompletionNotice(total, startTime);
         }
     }
+    // 添加确认对话框方法
+    private async showConfirmationDialog(fileCount: number): Promise<boolean> {
+        return new Promise((resolve) => {
+            const notice = new Notice(
+                `确定要处理 ${fileCount} 个文件吗？\n此操作将修改这些文件。`,
+                0
+            );
+            
+            // 添加确认和取消按钮
+            notice.noticeEl.createEl('button', {
+                text: '确认',
+                cls: 'mod-cta'
+            }).onclick = () => {
+                notice.hide();
+                resolve(true);
+            };
 
+            notice.noticeEl.createEl('button', {
+                text: '取消'
+            }).onclick = () => {
+                notice.hide();
+                resolve(false);
+            };
+        });
+    }
     /**
      * 更新进度显示
      */

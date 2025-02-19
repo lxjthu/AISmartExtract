@@ -3,25 +3,25 @@ import { App, TFile } from 'obsidian';
 import { PluginSettings, AIResponse,SummaryAIResponse } from '../types';
 import { AIServiceImpl } from './aiService';
 
+// 1. 首先添加 BatchTagService 的导入
+import { BatchTagService } from './batchTagService';
+
 export class SummaryService {
     private aiService: AIServiceImpl;
+    private batchTagService: BatchTagService;  // 添加新的服务实例
 
     constructor(
         private app: App,
         private settings: PluginSettings
     ) {
         this.aiService = new AIServiceImpl(settings);
+        this.batchTagService = new BatchTagService(app, settings);  // 初始化 BatchTagService
     }
 
     async generateFolderSummary(folderPath: string): Promise<string> {
-        console.log('Generating folder summary:', {
-            folderPath,
-            settings: this.settings.summary
-        });
-        
         try {
-            // 1. 获取文件夹下所有笔记
-            const files = await this.getMarkdownFiles(folderPath);
+            // 使用 BatchTagService 的方法获取文件
+            const files = await this.batchTagService.getMarkdownFiles(folderPath);
             
             // 2. 提取每个笔记的内容
             const notesContent = await Promise.all(
@@ -135,7 +135,7 @@ export class SummaryService {
     
         // 记录最终生成的提示词
         console.log('Final prompt length:', prompt.length);
-        
+    
         return prompt;
     }
     
