@@ -2,12 +2,16 @@
 import { App, PluginSettingTab, Setting, Modal,Notice } from 'obsidian';
 import type { TextComponent } from 'obsidian'; // 添加这个导入
 import type AISmartExtractPlugin from '../main';
-import { AIProvider, ProviderSettings,PromptTemplate, PluginSettings, SummarySettings, MetadataField } from '../types';
+import { AIProvider, PromptTemplate, MetadataField,AIResponseType,RewriteStyle } from '../types';
 import { FolderSuggestModal } from '../modals/folderSuggest';
 import { DEFAULT_SETTINGS  } from '../settings/settings';
 import { config } from 'process';
 export class AISmartExtractSettingTab extends PluginSettingTab {
     plugin: AISmartExtractPlugin;
+    private DEBUG = {
+        enabled: false,
+        rewrite: false
+    };
 
     constructor(app: App, plugin: AISmartExtractPlugin) {
         super(app, plugin);
@@ -441,105 +445,161 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
             this.plugin.settings.promptTemplate = target.value;
             await this.plugin.saveSettings();
         });
+        // 在 display() 方法中添加改写设置部分
+        containerEl.createEl('h3', { text: '改写设置' });
 
-         // 提示词模板管理
-         containerEl.createEl('h3', { text: 'AI 提示词模板管理' });
+        new Setting(containerEl)
+            .setName('创建备份')
+            .setDesc('改写前是否创建原文件的备份')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.rewrite.createBackup?? false)
+                .onChange(async (value) => {
+                    this.plugin.settings.rewrite.createBackup = value;
+                    await this.plugin.saveSettings();
+                }));
 
-         // 显示现有模板列表
-         this.plugin.settings.promptTemplates.forEach(template => {
-             const templateContainer = containerEl.createDiv('template-container');
-             templateContainer.addClass('template-item');
- 
-             new Setting(templateContainer)
-                 .setName(template.name)
-                 .setDesc(template.description || '')
-                 .addButton(btn => btn
-                     .setButtonText('编辑')
-                     .onClick(() => {
-                         this.showTemplateEditModal(template);
-                     }))
-                 .addButton(btn => btn
-                     .setButtonText('删除')
-                     .onClick(async () => {
-                         if (template.id === 'default') {
-                             new Notice('不能删除默认模板');
-                             return;
-                         }
-                         this.plugin.settings.promptTemplates = 
-                             this.plugin.settings.promptTemplates.filter(t => t.id !== template.id);
-                         await this.plugin.saveSettings();
-                         this.display();
-                     }));
-         });
- 
-         // 添加新模板按钮
-         new Setting(containerEl)
-             .setName('添加新模板')
-             .addButton(btn => btn
-                 .setButtonText('添加')
-                 .onClick(() => {
-                     this.showTemplateEditModal();
-                 }));
- 
-         // 命令模板映射设置
-         containerEl.createEl('h3', { text: '命令模板映射' });
-         
-         // 为每个命令创建模板选择器
-         // 在命令模板映射部分添加特殊处理
-        // 在 settingTab.ts 中的 display() 方法中修改命令模板映射部分
-        Object.keys(this.plugin.commands).forEach(commandId => {
-            // 跳过元数据相关命令的模板映射
-        if (commandId === 'add-smart-metadata' || 
-            commandId === 'batch-add-smart-metadata') {
-            return;
-        }
-            const command = this.plugin.commands[commandId];
-            const container = containerEl.createDiv('command-settings');
+        new Setting(containerEl)
+            .setName('保持结构')
+            .setDesc('是否尽量保持原文的段落结构')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.rewrite.keepStructure?? false)
+                .onChange(async (value) => {
+                    this.plugin.settings.rewrite.keepStructure = value;
+                    await this.plugin.saveSettings();
+                }));
 
-            new Setting(container)
-                .setName(command.name)
-                .setDesc('选择命令使用的模板和响应类型')
-                .addDropdown(dropdown => {
-                    // 获取命令的响应类型，如果没有设置则使用默认值
-                    const responseType = this.plugin.settings.commandResponseTypes[commandId] || 'tag';
-                    
-                    // 获取该响应类型的所有可用模板
-                    const availableTemplates = this.plugin.settings.promptTemplates
-                        .filter(t => t.type === responseType);
-                    
-                    // 如果没有可用模板，添加一个默认模板
-                    if (availableTemplates.length === 0) {
-                        const defaultTemplate: PromptTemplate = {
-                            id: `default-${responseType}`,
-                            name: `默认${responseType}模板`,
-                            content: this.plugin.settings.defaultPrompt,
-                            type: responseType,
-                            description: '默认模板'
-                        };
-                        this.plugin.settings.promptTemplates.push(defaultTemplate);
-                        availableTemplates.push(defaultTemplate);
-                    }
-                    
-                    // 添加所有可用模板到下拉列表
-                    availableTemplates.forEach(template => {
-                        dropdown.addOption(template.id, template.name);
-                    });
-                    
-                    // 设置当前选中的模板
-                    const currentTemplateId = this.plugin.settings.commandTemplateMap[commandId] || 
-                                        availableTemplates[0].id;
-                    dropdown.setValue(currentTemplateId);
-                    
-                    dropdown.onChange(async value => {
-                        this.plugin.settings.commandTemplateMap[commandId] = value;
-                        await this.plugin.saveSettings();
-                    });
-                });
+        // 添加改写提示词模板设置
+        const rewriteDescEl = containerEl.createEl('p', {
+            text: '自定义改写的提示词模板。使用 {text} 表示原文内容。'
+        });
+        rewriteDescEl.style.fontSize = '12px';
+        rewriteDescEl.style.color = 'var(--text-muted)';
+
+        const rewritePromptArea = containerEl.createEl('textarea', {
+            text: this.plugin.settings.rewrite.template || DEFAULT_SETTINGS.rewrite.template
         });
 
-    }
+        rewritePromptArea.style.width = '100%';
+        rewritePromptArea.style.height = '200px';
+        rewritePromptArea.style.marginBottom = '1em';
+        rewritePromptArea.style.fontFamily = 'monospace';
 
-    private resetMetadataPrompts() {
+        rewritePromptArea.addEventListener('change', async (e) => {
+            const target = e.target as HTMLTextAreaElement;
+            this.plugin.settings.rewrite.template = target.value;
+            await this.plugin.saveSettings();
+        });
+
+        // 添加重置按钮
+        new Setting(containerEl)
+        .setName('重置改写提示词')
+        .setDesc('将改写提示词重置为默认值')
+        .addButton(button => button
+            .setButtonText('重置')
+            .onClick(async () => {
+                const defaultTemplate = DEFAULT_SETTINGS.rewrite.template;
+                this.plugin.settings.rewrite.template = defaultTemplate;
+                await this.plugin.saveSettings();
+                rewritePromptArea.value = defaultTemplate;
+            }));
+
+        // 添加改写风格选择
+        new Setting(containerEl)
+        .setName('改写风格')
+        .setDesc('选择预设的改写风格')
+        .addDropdown(dropdown => {
+            if (this.DEBUG.enabled && this.DEBUG.rewrite) {
+                console.log('[Debug] 初始化改写风格下拉菜单');
+                console.log('[Debug] 当前所有风格:', this.plugin.settings.rewrite.styles);
+            }
+            // 添加默认选项
+            dropdown.addOption('default', '默认风格');
+            
+            // 添加预设风格并按排序顺序显示
+            const sortedStyles = [...this.plugin.settings.rewrite.styles]
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
+                if (this.DEBUG.enabled && this.DEBUG.rewrite) {
+                    console.log('[Debug] 排序后的风格:', sortedStyles);
+                }
+            
+            sortedStyles.forEach(style => {
+                dropdown.addOption(style.id, style.name);
+            });
+            
+            // 设置当前选中的风格
+            const currentStyleId = this.plugin.settings.rewrite.defaultStyleId || 'default';
+            if (this.DEBUG.enabled && this.DEBUG.rewrite) {
+                console.log('[Debug] 当前选中的风格ID:', currentStyleId);
+            }
+            dropdown.setValue(currentStyleId);
+            
+            dropdown.onChange(async (value) => {
+                if (this.DEBUG.enabled && this.DEBUG.rewrite) {
+                    console.log('[Debug] 改写风格变更:', value);
+                }
+                let newTemplate = '';
+                let newStyleId = value;
+                
+                if (value === 'default') {
+                    newTemplate = DEFAULT_SETTINGS.rewrite.template;
+                    newStyleId = '';
+                } else {
+                    const selectedStyle = this.plugin.settings.rewrite.styles.find(s => s.id === value);
+                    if (selectedStyle) {
+                        newTemplate = selectedStyle.template;
+                        if (this.DEBUG.enabled && this.DEBUG.rewrite) {
+                            console.log('[Debug] 选中的风格:', selectedStyle);
+                            console.log('[Debug] 使用风格模板:', newTemplate);
+                        }
+                    }
+                }
+                
+                if (newTemplate) {
+                    rewritePromptArea.value = newTemplate;
+                    this.plugin.settings.rewrite.template = newTemplate;
+                    this.plugin.settings.rewrite.defaultStyleId = newStyleId;
+                    await this.plugin.saveSettings();
+                }
+            });
+        });
+
+        // 添加风格管理按钮
+        new Setting(containerEl)
+        .setName('管理改写风格')
+        .setDesc('添加、编辑或删除改写风格')
+        .addButton(button => button
+            .setButtonText('管理风格')
+            .onClick(() => {
+                this.showRewriteStylesModal();
+            }));
+
+            
+            this.addDebugSettings(containerEl);
+
+  }
+
+    private addDebugSettings(containerEl: HTMLElement) {
+        containerEl.createEl('h3', { text: '调试设置' });
+
+        new Setting(containerEl)
+            .setName('启用调试模式')
+            .setDesc('开启后将在控制台输出详细日志')
+            .addToggle(toggle => toggle
+                .setValue(this.DEBUG.enabled)
+                .onChange(value => {
+                    this.DEBUG.enabled = value;
+                }));
+
+        new Setting(containerEl)
+            .setName('改写调试')
+            .setDesc('记录改写相关的调试信息')
+            .addToggle(toggle => toggle
+                .setValue(this.DEBUG.rewrite)
+                .onChange(value => {
+                    this.DEBUG.rewrite = value;
+                }));
+    }  
+  private resetMetadataPrompts() {
         this.plugin.settings.metadata.configs = DEFAULT_SETTINGS.metadata.configs.map(config => ({
             ...config
         }));
@@ -569,6 +629,67 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
             }
         );
         modal.open();
+    }
+
+    private setupCommandTemplateMapping(containerEl: HTMLElement) {
+        containerEl.createEl('h3', { text: '命令模板映射' });
+        
+        Object.keys(this.plugin.commands).forEach(commandId => {
+            const command = this.plugin.commands[commandId];
+            
+            // 确定命令的响应类型
+            let responseType: AIResponseType;
+            switch (commandId) {
+                case 'create-smart-note-from-markdown':
+                case 'create-smart-note-from-pdf':
+                case 'batch-process-folder':
+                    responseType = 'tag';
+                    break;
+                case 'generate-folder-summary':
+                    responseType = 'summary';
+                    break;
+                case 'add-smart-metadata':
+                case 'batch-add-smart-metadata':
+                    responseType = 'metadata';
+                    break;
+                case 'rewrite-note':
+                case 'batch-rewrite-notes':
+                    responseType = 'rewrite';
+                    break;
+                default:
+                    responseType = 'tag';
+            }
+    
+            // 保存命令的响应类型
+            this.plugin.settings.commandResponseTypes[commandId] = responseType;
+    
+            // 创建模板选择器
+            new Setting(containerEl)
+                .setName(command.name)
+                .setDesc(`选择用于"${command.name}"的模板`)
+                .addDropdown(dropdown => {
+                    // 只显示匹配当前命令类型的模板
+                    const availableTemplates = this.plugin.settings.promptTemplates
+                        .filter(t => t.type === responseType);
+    
+                    availableTemplates.forEach(template => {
+                        dropdown.addOption(template.id, template.name);
+                    });
+    
+                    // 设置当前选中的模板
+                    const currentTemplateId = this.plugin.settings.commandTemplateMap[commandId] || 
+                                           availableTemplates[0]?.id;
+                    
+                    if (currentTemplateId) {
+                        dropdown.setValue(currentTemplateId);
+                    }
+    
+                    dropdown.onChange(async value => {
+                        this.plugin.settings.commandTemplateMap[commandId] = value;
+                        await this.plugin.saveSettings();
+                    });
+                });
+        });
     }
     
     // 在 AISmartExtractSettingTab 类中添加新方法
@@ -620,7 +741,198 @@ export class AISmartExtractSettingTab extends PluginSettingTab {
         });
     }
 
+//改写风格管理模态框
+private showRewriteStylesModal(): void {
+    const modal = new Modal(this.app);
+    modal.titleEl.setText('管理改写风格');
 
+    const contentEl = modal.contentEl;
+    contentEl.empty();
+
+    // 按标签分类显示风格
+    const stylesByTag = new Map<string, RewriteStyle[]>();
+    
+    // 未分类的风格
+    const untaggedStyles: RewriteStyle[] = [];
+
+    // 对风格进行分类
+    this.plugin.settings.rewrite.styles.forEach(style => {
+        if (!style.tags || style.tags.length === 0) {
+            untaggedStyles.push(style);
+        } else {
+            style.tags.forEach(tag => {
+                if (!stylesByTag.has(tag)) {
+                    stylesByTag.set(tag, []);
+                }
+                stylesByTag.get(tag)?.push(style);
+            });
+        }
+    });
+
+    // 显示分类的风格
+    stylesByTag.forEach((styles, tag) => {
+        const categoryEl = contentEl.createEl('div', { cls: 'style-category' });
+        categoryEl.createEl('h4', { text: tag });
+
+        // 按 order 排序显示风格
+        styles.sort((a, b) => (a.order || 0) - (b.order || 0))
+              .forEach(style => this.createStyleElement(categoryEl, style));
+    });
+
+    // 显示未分类的风格
+    if (untaggedStyles.length > 0) {
+        const untaggedEl = contentEl.createEl('div', { cls: 'style-category' });
+        untaggedEl.createEl('h4', { text: '未分类' });
+        
+        untaggedStyles.sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .forEach(style => this.createStyleElement(untaggedEl, style));
+    }
+
+    // 添加新风格按钮
+    new Setting(contentEl)
+        .setName('添加新风格')
+        .addButton(button => button
+            .setButtonText('添加')
+            .onClick(() => {
+                this.showStyleEditModal();
+            }));
+
+    modal.open();
+}
+
+// 辅助方法：创建风格元素
+private createStyleElement(container: HTMLElement, style: RewriteStyle): void {
+    const styleDiv = container.createDiv('style-item');
+    
+    new Setting(styleDiv)
+        .setName(style.name)
+        .setDesc(style.description || '')
+        .addExtraButton(button => button
+            .setIcon(style.defaultTemplate ? 'star' : 'star-off')
+            .setTooltip(style.defaultTemplate ? '默认模板' : '设为默认')
+            .onClick(async () => {
+                // 更新默认模板状态
+                this.plugin.settings.rewrite.styles.forEach(s => s.defaultTemplate = false);
+                style.defaultTemplate = true;
+                this.plugin.settings.rewrite.defaultStyleId = style.id;
+                await this.plugin.saveSettings();
+                this.display();
+            }))
+        .addButton(button => button
+            .setButtonText('编辑')
+            .onClick(() => {
+                this.showStyleEditModal(style);
+            }))
+        .addButton(button => button
+            .setButtonText('删除')
+            .onClick(async () => {
+                this.plugin.settings.rewrite.styles = 
+                    this.plugin.settings.rewrite.styles.filter(s => s.id !== style.id);
+                await this.plugin.saveSettings();
+                this.display();
+            }));
+}
+
+private showStyleEditModal(style?: RewriteStyle): void {
+    const modal = new Modal(this.app);
+    modal.titleEl.setText(style ? '编辑改写风格' : '添加改写风格');
+
+    const contentEl = modal.contentEl;
+    contentEl.empty();
+    
+    let nameInput: TextComponent;
+    let descInput: TextComponent;
+    let templateInput: HTMLTextAreaElement;
+    let tagsInput: TextComponent;
+    let orderInput: TextComponent;
+
+    // 风格名称
+    new Setting(contentEl)
+        .setName('风格名称')
+        .setDesc('输入一个易于识别的名称')
+        .addText(text => {
+            nameInput = text;
+            text.setValue(style?.name || '');
+        });
+
+    // 风格描述
+    new Setting(contentEl)
+        .setName('风格描述')
+        .setDesc('简要描述该风格的特点')
+        .addText(text => {
+            descInput = text;
+            text.setValue(style?.description || '');
+        });
+
+    // 风格标签
+    new Setting(contentEl)
+        .setName('风格标签')
+        .setDesc('添加标签以便分类（用逗号分隔）')
+        .addText(text => {
+            tagsInput = text;
+            text.setValue(style?.tags?.join(',') || '');
+        });
+
+    // 排序顺序
+    new Setting(contentEl)
+        .setName('排序顺序')
+        .setDesc('设置在列表中的显示顺序（数字越小越靠前）')
+        .addText(text => {
+            orderInput = text;
+            text.setValue(String(style?.order || 0));
+        });
+
+    // 提示词模板
+    contentEl.createEl('h3', { text: '提示词模板' });
+    templateInput = contentEl.createEl('textarea');
+    templateInput.value = style?.template || '';
+    templateInput.style.width = '100%';
+    templateInput.style.height = '200px';
+    templateInput.style.marginBottom = '1em';
+    templateInput.style.fontFamily = 'monospace';
+
+    // 保存和取消按钮
+    new Setting(contentEl)
+        .addButton(button => button
+            .setButtonText('保存')
+            .onClick(async () => {
+                const newStyle: RewriteStyle = {
+                    id: style?.id || String(Date.now()),
+                    name: nameInput.getValue(),
+                    description: descInput.getValue(),
+                    template: templateInput.value,
+                    tags: tagsInput.getValue().split(',').map(tag => tag.trim()).filter(tag => tag),
+                    order: parseInt(orderInput.getValue()) || 0,
+                    defaultTemplate: style?.defaultTemplate || false
+                };
+
+                if (!newStyle.name || !newStyle.template) {
+                    new Notice('风格名称和模板内容不能为空');
+                    return;
+                }
+
+                if (style) {
+                    // 编辑现有风格
+                    const index = this.plugin.settings.rewrite.styles
+                        .findIndex(s => s.id === style.id);
+                    if (index !== -1) {
+                        this.plugin.settings.rewrite.styles[index] = newStyle;
+                    }
+                } else {
+                    // 添加新风格
+                    this.plugin.settings.rewrite.styles.push(newStyle);
+                }
+
+                await this.plugin.saveSettings();
+                this.display();
+                modal.close();
+            }))
+        .addButton(button => button
+            .setButtonText('取消')
+            .onClick(() => modal.close()));
+
+    modal.open();
+}
 
 
     private renderProviderSpecificSettings(containerEl: HTMLElement) {
@@ -795,33 +1107,47 @@ class TemplateEditModal extends Modal {
     }
 
     onOpen() {
-        const {contentEl} = this;
+        const { contentEl } = this;
+        contentEl.empty();
 
-        contentEl.createEl('h3', {text: this.template.id ? '编辑模板' : '新建模板'});
+        contentEl.createEl('h3', { text: this.template.id ? '编辑模板' : '新建模板' });
 
         // 模板名称
         new Setting(contentEl)
             .setName('模板名称')
+            .setDesc('输入一个易于识别的名称')
             .addText(text => text
                 .setValue(this.template.name)
                 .onChange(value => this.template.name = value));
 
+        // 模板类型
+        new Setting(contentEl)
+            .setName('模板类型')
+            .setDesc('选择模板的用途类型')
+            .addDropdown(dropdown => dropdown
+                .addOption('tag', '标签提取')
+                .addOption('metadata', '元数据分析')
+                .addOption('summary', '笔记总结')
+                .addOption('rewrite', '内容改写')
+                .setValue(this.template.type)
+                .onChange(value => this.template.type = value as AIResponseType));
+
         // 模板描述
         new Setting(contentEl)
             .setName('模板描述')
+            .setDesc('简要描述模板的用途')
             .addText(text => text
                 .setValue(this.template.description || '')
                 .onChange(value => this.template.description = value));
 
         // 模板内容
-        contentEl.createEl('h4', {text: '模板内容'});
-        const textarea = contentEl.createEl('textarea', {
-            text: this.template.content
-        });
-        textarea.style.width = '100%';
-        textarea.style.height = '200px';
-        textarea.style.marginBottom = '1em';
-        textarea.addEventListener('input', e => {
+        contentEl.createEl('h4', { text: '模板内容' });
+        const templateContent = contentEl.createEl('textarea');
+        templateContent.value = this.template.content;
+        templateContent.style.width = '100%';
+        templateContent.style.height = '200px';
+        templateContent.style.marginBottom = '1em';
+        templateContent.addEventListener('change', e => {
             this.template.content = (e.target as HTMLTextAreaElement).value;
         });
 
@@ -830,6 +1156,10 @@ class TemplateEditModal extends Modal {
             .addButton(btn => btn
                 .setButtonText('保存')
                 .onClick(async () => {
+                    if (!this.template.name || !this.template.content) {
+                        new Notice('模板名称和内容不能为空');
+                        return;
+                    }
                     await this.onSubmit(this.template);
                     this.close();
                 }))
@@ -837,7 +1167,6 @@ class TemplateEditModal extends Modal {
                 .setButtonText('取消')
                 .onClick(() => this.close()));
     }
-
     onClose() {
         const {contentEl} = this;
         contentEl.empty();

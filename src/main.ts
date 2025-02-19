@@ -1,6 +1,6 @@
 // src/main.ts
 import { App, Plugin, Notice, MarkdownView, View } from 'obsidian';
-import { ExtendedCommand,PluginSettings } from './types';
+import { ExtendedCommand,PluginSettings,RewriteOptions } from './types';
 import { DEFAULT_SETTINGS } from './settings/settings';
 import { AISmartExtractSettingTab } from './settings/settingTab';
 import { NoteService } from './services/noteService';
@@ -13,6 +13,7 @@ import { BatchProcessor } from './services/BatchProcessor';
 import { FolderSuggestModal } from './modals/folderSuggest';
 import { SummaryService } from './services/summaryService';
 import { MetadataService } from './services/metadataService';
+import { RewriteService } from './services/rewriteService';
 
 export default class AISmartExtractPlugin extends Plugin {
     settings: PluginSettings;
@@ -25,6 +26,7 @@ export default class AISmartExtractPlugin extends Plugin {
     public commands: { [key: string]: ExtendedCommand } = {};
     private summaryService: SummaryService;
     private metadataService: MetadataService;
+    private rewriteService: RewriteService;
 
 
 
@@ -50,7 +52,7 @@ export default class AISmartExtractPlugin extends Plugin {
             this.metadataService
         );
         this.summaryService = new SummaryService(this.app, this.settings);
-        
+        this.rewriteService = new RewriteService(this.app, this.settings);
 
 
         // 添加设置标签页
@@ -360,6 +362,71 @@ export default class AISmartExtractPlugin extends Plugin {
                 }).open();
             }
         };
+        // 单文件改写命令
+        const rewriteCommand: ExtendedCommand = {
+            id: 'rewrite-note',
+            name: '智能改写笔记',
+            editorCallback: async (editor, view: MarkdownView) => {
+                if (!view.file) {
+                    new Notice('当前视图没有关联文件');
+                    return;
+                }
+
+                const options: RewriteOptions = {
+                    template: this.settings.rewrite.template,
+                    createBackup: this.settings.rewrite.createBackup,
+                    keepStructure: this.settings.rewrite.keepStructure
+                };
+
+                this.queueService.addTask(
+                    async () => {
+                        await this.rewriteService.processRewrite(view.file!, options);
+                    },
+                    () => new Notice('笔记改写完成！'),
+                    (error) => new Notice('改写失败: ' + error.message)
+                );
+            }
+        };
+
+        // 批量改写命令
+        const batchRewriteCommand: ExtendedCommand = {
+            id: 'batch-rewrite-notes',
+            name: '批量智能改写笔记',
+            callback: () => {
+                new FolderSuggestModal(this.app, async (folderPath) => {
+                    if (!folderPath) {
+                        new Notice('未选择文件夹');
+                        return;
+                    }
+
+                    try {
+                        const files = await this.rewriteService.getMarkdownFiles(folderPath);
+                        
+                        if (files.length === 0) {
+                            new Notice('所选文件夹中没有 Markdown 文件');
+                            return;
+                        }
+
+                        if (!await this.confirmBatchProcess(files.length)) {
+                            return;
+                        }
+
+                        const options: RewriteOptions = {
+                            template: this.settings.rewrite.template,
+                            createBackup: this.settings.rewrite.createBackup,
+                            keepStructure: this.settings.rewrite.keepStructure
+                        };
+
+                        await this.rewriteService.processBatchRewrite(files, options);
+
+                    } catch (error) {
+                        console.error('批量改写初始化失败:', error);
+                        new Notice('批量改写初始化失败，请查看控制台了解详情');
+                    }
+                }).open();
+            }
+        };
+
 
 
 
@@ -373,6 +440,8 @@ export default class AISmartExtractPlugin extends Plugin {
         this.commands['generate-folder-summary'] = summaryCommand;
         this.commands['add-smart-metadata'] = metadataCommand;
         this.commands['batch-add-smart-metadata'] = batchMetadataCommand;
+        this.commands['rewrite-note'] = rewriteCommand;
+        this.commands['batch-rewrite-notes'] = batchRewriteCommand;
     
        // 注册所有命令到 Obsidian
     const allCommands = [
@@ -381,7 +450,9 @@ export default class AISmartExtractPlugin extends Plugin {
         batchCommand,
         summaryCommand,  // 添加新命令
         metadataCommand,
-        batchMetadataCommand
+        batchMetadataCommand,
+        rewriteCommand,
+        batchRewriteCommand
     ];
 
     allCommands.forEach(command => this.addCommand(command));

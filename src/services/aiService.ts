@@ -10,13 +10,14 @@ import {
     TagAIResponse,
     MetadataAIResponse,
     MetadataField,
-    SummaryAIResponse
+    SummaryAIResponse,
+    RewriteAIResponse
 } from '../types';
 
 export class AIServiceImpl implements AIService  {
 
     // 在这里添加调试开关，类的成员变量区域
-    private readonly DEBUG = false;
+    private readonly DEBUG = true;
     
     // 添加日志方法
     private log(message: string, ...args: any[]) {
@@ -177,10 +178,38 @@ export class AIServiceImpl implements AIService  {
                 return this.parseMetadataResponse(text);
             case 'summary':
                 return this.parseSummaryResponse(text);
+                case 'rewrite':  // 添加改写类型处理
+                return this.parseRewriteResponse(text);
             default:
                 throw new Error(`不支持的响应类型: ${responseType}`);
         }
     }
+
+    // 添加改写响应解析方法
+        private parseRewriteResponse(text: string): RewriteAIResponse {
+            try {
+                // 检查是否收到了有效的响应
+                if (!text || typeof text !== 'string') {
+                    throw new Error('无效的AI响应');
+                }
+
+                // 提取改写内容
+                const content = text.trim();
+
+                // 验证内容
+                if (!content) {
+                    throw new Error('改写内容为空');
+                }
+
+                return {
+                    type: 'rewrite',
+                    content: content
+                };
+            } catch (error) {
+                console.error('解析改写响应失败:', error, '\n原始响应:', text);
+                throw new Error('改写响应格式不正确');
+            }
+        }
 
     private extractResponseText(aiResponse: any): string {
         if (aiResponse.output?.text) {

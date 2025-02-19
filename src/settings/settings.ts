@@ -37,6 +37,92 @@ const DEFAULT_TEMPLATES: PromptTemplate[] = [
 关键词：主题1，主题2，主题3
 总结：请在此处提供200字以内的主要观点总结
 标签：#领域1 #领域2 #领域3`
+    },
+    {
+        id: 'default-rewrite',
+        name: '默认改写模板',
+        type: 'rewrite',
+        description: '改写文本内容，优化表达和结构',
+        content: `请帮我改写以下文本，使其表达更清晰、结构更合理。
+
+要求：
+1. 保持原文的核心意思不变
+2. 优化语言表达，使其更流畅
+3. 调整段落结构，使逻辑更清晰
+4. 添加必要的过渡语句
+5. 保持专业性和准确性
+
+请按照以下格式返回：
+1. 改写后的内容
+2. 主要改动说明（列出3-5点）
+3. 改进建议（如有）
+
+原文：
+{text}`
+    }
+];
+
+// 首先定义默认的改写风格
+const DEFAULT_REWRITE_STYLES = [
+    {
+        id: 'academic',
+        name: '学术风格',
+        description: '使用更专业的学术表达',
+        template: `请将以下文本改写为学术风格。
+
+要求：
+1. 使用更专业的学术用语
+2. 增加引用和论证
+3. 保持客观严谨的语气
+4. 突出理论依据和研究价值
+
+请按照以下格式返回：
+1. 改写后的内容
+2. 主要改动说明（列出3-5点）
+3. 改进建议（如有）
+
+原文：
+{text}`
+    },
+    {
+        id: 'concise',
+        name: '简洁风格',
+        description: '精简表达，突出重点',
+        template: `请将以下文本改写得更简洁。
+
+要求：
+1. 删除冗余内容
+2. 使用简短清晰的句子
+3. 保留核心信息
+4. 突出关键观点
+
+请按照以下格式返回：
+1. 改写后的内容
+2. 主要改动说明（列出3-5点）
+3. 改进建议（如有）
+
+原文：
+{text}`
+    },
+    {
+        id: 'detailed',
+        name: '详细风格',
+        description: '添加更多细节和解释',
+        template: `请将以下文本改写得更详细。
+
+要求：
+1. 添加更多背景信息
+2. 扩展重要概念的解释
+3. 增加具体的例子
+4. 深入分析因果关系
+
+请按照以下格式返回：
+1. 改写后的内容
+2. 主要改动说明（列出3-5点）
+3. 改进建议（如有）
+
+原文：
+{text}`
     }
 ];
 
@@ -141,6 +227,13 @@ export const DEFAULT_SETTINGS: PluginSettings = {
         'create-smart-note-from-pdf': 'tag',
         'batch-process-folder': 'tag',
         'generate-folder-summary': 'summary',
+    },
+    rewrite: {
+        template: DEFAULT_TEMPLATES.find(t => t.id === 'default-rewrite')?.content || '',
+        createBackup: true,
+        keepStructure: true,
+        fullDocument: false,
+        styles: DEFAULT_REWRITE_STYLES  // 使用预定义的风格列表
     },
 
 

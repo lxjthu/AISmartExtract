@@ -7,7 +7,7 @@ export interface ExtendedCommand extends Command {
 }
 
 //不同类型AI响应接口
-export type AIResponseType = 'tag' | 'metadata' | 'summary';
+export type AIResponseType = 'tag' | 'metadata' | 'summary'| 'rewrite';
 // 基础响应接口
 export interface BaseAIResponse {
     type: AIResponseType;
@@ -51,7 +51,15 @@ export interface SummaryAIResponse extends BaseAIResponse {
     tags: string[];
 }
 
-export type AIResponse = TagAIResponse | MetadataAIResponse | SummaryAIResponse;
+// 添加改写响应接口
+export interface RewriteAIResponse extends BaseAIResponse {
+    type: 'rewrite';
+    content: string;           // 改写后的内容
+    changes?: string[];        // 改动说明
+    suggestions?: string[];    // 改进建议
+}
+
+export type AIResponse = TagAIResponse | MetadataAIResponse | SummaryAIResponse | RewriteAIResponse;
 
 
 // 扩展 AI 提供商类型
@@ -98,6 +106,42 @@ export interface SummarySettings {
     includeBacklinks: boolean;
     knowledgeGraphView: boolean;
     promptTemplate: string;  // 添加提示词模板设置
+}
+// 添加改写设置接口
+// 基础改写配置接口
+export interface BaseRewriteConfig {
+    template: string;           // 改写提示词模板
+    createBackup?: boolean;     // 是否创建备份
+    keepStructure?: boolean;    // 是否保持原有结构
+    fullDocument?: boolean;     // 是否改写整个文档
+}
+
+// 改写设置接口（用于插件设置）
+export interface RewriteSettings extends BaseRewriteConfig {
+    styles: RewriteStyle[];     // 预设的改写风格列表
+    defaultStyleId?: string;    // 默认风格ID
+    customStyles?: boolean;     // 是否允许自定义风格
+    styleCategories?: string[]; // 风格分类
+}
+
+// 改写选项接口（用于执行改写操作）
+export interface RewriteOptions extends BaseRewriteConfig {
+    style?: string;            // 选择的改写风格ID
+    category?: string;         // 风格分类
+    preserveFormatting?: boolean; // 是否保留原文格式
+    customTemplate?: string;   // 自定义模板内容
+    tags?: string[];          // 风格标签
+}
+
+//改写风格接口
+export interface RewriteStyle {
+    id: string;
+    name: string;
+    description?: string;
+    template: string;
+    defaultTemplate?: boolean;  // 添加默认模板标识
+    order?: number;            // 添加排序字段
+    tags?: string[];          // 添加标签分类
 }
 
 // 元数据配置接口
@@ -163,6 +207,7 @@ export interface PluginSettings {
     commandResponseTypes: {
         [commandId: string]: AIResponseType;
     };
+    rewrite: RewriteSettings;  // 添加改写设置
 }
 
 // 提示词模板定义
@@ -171,7 +216,7 @@ export interface PromptTemplate {
     name: string;         // 模板名称
     content: string;      // 模板内容
     description?: string; // 模板描述（可选）
-    type: 'tag' | 'metadata' | 'summary'; // 添加 type 属性并定义其可能的值
+    type: 'tag' | 'metadata' | 'summary'|'rewrite'; // 添加 type 属性并定义其可能的值
 }
 
 
