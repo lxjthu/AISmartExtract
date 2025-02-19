@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "lint": "eslint . --ext .ts",
+    "clean": "rm -rf build"
   },
   "keywords": [
     "obsidian",
@@ -17,17 +19,17 @@
   "author": "小狼早上好",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^16.11.6",
-    "@typescript-eslint/eslint-plugin": "^5.2.0",
-    "@typescript-eslint/parser": "^5.2.0",
-    "builtin-modules": "^3.2.0",
-    "esbuild": "0.13.12",
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.19.11",
     "obsidian": "latest",
-    "tslib": "2.3.1",
-    "typescript": "4.4.4"
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "moment": "^2.30.1",
-    "svelte": "^5.19.9"
+    "svelte": "^4.2.9"
   }
 }
