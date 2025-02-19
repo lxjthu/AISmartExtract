@@ -187,7 +187,7 @@ export class NoteService {
         }
 
         // 创建文件
-        const filePath = `${targetFolder}/${fileName}`;
+        const filePath = `${targetFolder}/${fileName}.md`;
         const file = await this.app.vault.create(filePath, content);
         return file;
     }
@@ -197,39 +197,21 @@ export class NoteService {
  */
     private async openNote(file: TFile): Promise<void> {
         try {
-            // 获取当前活动的视图
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            let targetLeaf;
+            // 获取当前活动的叶子
+            const activeLeaf = this.app.workspace.activeLeaf;
             
-            if (this.settings.openInNewTab) {
-                // 在新标签页打开
-                targetLeaf = this.app.workspace.createLeafInParent(
-                    this.app.workspace.rootSplit,
-                    this.settings.splitDirection
-                );
-            } else {
-                // 在当前标签页打开
-                targetLeaf = activeView?.leaf;
-                if (!targetLeaf) {
-                    // 如果没有活动的标签页，创建一个新的
-                    targetLeaf = this.app.workspace.createLeafInParent(
-                        this.app.workspace.rootSplit,
-                        this.settings.splitDirection
-                    );
-                }
+            if (!activeLeaf) {
+                throw new Error('No active leaf found');
             }
     
-            // 打开文件
-            await targetLeaf.openFile(file);
+            // 在当前叶子中打开文件
+            await activeLeaf.openFile(file);
             
-            // 激活新打开的标签页
-            this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
-    
             // 确保视图类型是 markdown
-            if (targetLeaf.view.getViewType() !== 'markdown') {
-                await targetLeaf.setViewState({
+            if (activeLeaf.view.getViewType() !== 'markdown') {
+                await activeLeaf.setViewState({
                     type: 'markdown',
-                    state: targetLeaf.view.getState()
+                    state: activeLeaf.view.getState()
                 });
             }
         } catch (error) {

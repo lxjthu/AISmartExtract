@@ -27,6 +27,7 @@
     "typescript": "4.4.4"
   },
   "dependencies": {
+    "moment": "^2.30.1",
     "svelte": "^5.19.9"
   }
 }
