@@ -55,8 +55,7 @@ export default class AISmartExtractPlugin extends Plugin {
         this.rewriteService = new RewriteService(this.app, this.settings);
 
 
-        // 添加设置标签页
-        this.addSettingTab(new AISmartExtractSettingTab(this.app, this));
+
 
         // 添加命令
         this.addCommands();
